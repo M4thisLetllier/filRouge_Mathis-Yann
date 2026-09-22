@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -107,18 +108,21 @@ fun EcranConnexion() {
         Spacer(modifier = Modifier.padding(8.dp))
         Button(modifier = Modifier.align(Alignment.CenterHorizontally).fillMaxWidth().padding(25.dp), onClick = { /* Handle login click */ })
         {
-            Text("Sign in")
+            Text("Connection")
         }
         Spacer(modifier = Modifier.padding(8.dp))
         Button(modifier = Modifier.align(Alignment.CenterHorizontally), onClick = { /* Handle signup click */ })
         {
-            Text("Sign Up")
+            Text("Nouveau compte")
         }
         Spacer(modifier = Modifier.padding(8.dp))
-        Text(
-            text = "Forgot Password?",
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        )
+        TextButton(
+            onClick = {
+                // TODO: Redirection plus tard
+            }
+        ) {
+            Text(text = "Mot de passe oublié ?")
+        }
     }
 }
 
