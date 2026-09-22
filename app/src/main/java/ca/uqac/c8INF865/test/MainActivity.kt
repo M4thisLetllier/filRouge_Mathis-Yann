@@ -4,9 +4,11 @@ import android.app.ComponentCaller
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import androidx.compose.ui.res.painterResource
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -58,14 +60,16 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
+    Column() {
         Text(
             text = "Hello $name!",
-            modifier = modifier
         )
         Text(
             text = "Welcome to the app!",
-            modifier = modifier
+        )
+        Image(modifier = modifier .fillMaxSize(),
+            painter = painterResource(id = R.drawable.uqac_logo),
+            contentDescription = "Your Image"
         )
     }
 }
