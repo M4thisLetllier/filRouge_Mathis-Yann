@@ -16,9 +16,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.tooling.preview.Preview
 import ca.uqac.c8INF865.test.ui.theme.TestTheme
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,13 +31,13 @@ class MainActivity : ComponentActivity() {
         Log.d("MainActivity","On Create")
         enableEdgeToEdge()
         setContent {
-            TestTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Yann",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                    AfficherMonImage()
+            // Appelle ta fonction d'interface ici
+            MaterialTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    PageDeConnexion()
                 }
             }
         }
@@ -85,6 +90,76 @@ fun AfficherMonImage(modifier : Modifier = Modifier) {
     )
 }
 
+@Composable
+fun PageDeConnexion() {
+    // États locaux pour stocker le texte saisi (nécessaire pour l'UI de Compose)
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    // Column permet d'aligner les éléments verticalement
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp), // Marges autour de l'écran
+        verticalArrangement = Arrangement.Center, // Centre tout au milieu de l'écran
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Titre de la page
+        Text(
+            text = "Bienvenue",
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 32.dp)
+        )
+
+        // Champ Email
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Adresse e-mail") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(16.dp)) // Espace entre les champs
+
+        // Champ Mot de passe
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Mot de passe") },
+            visualTransformation = PasswordVisualTransformation(), // Masque le mot de passe (***)
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Bouton de connexion
+        Button(
+            onClick = {
+                // TODO: Ajouter la logique d'événement plus tard
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp) // Hauteur confortable pour cliquer
+        ) {
+            Text(text = "Se connecter")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Lien "Mot de passe oublié"
+        TextButton(
+            onClick = {
+                // TODO: Redirection plus tard
+            }
+        ) {
+            Text(text = "Mot de passe oublié ?")
+        }
+    }
+}
 //@Preview(showBackground = true)
 //@Composable
 //fun GreetingPreview() {
