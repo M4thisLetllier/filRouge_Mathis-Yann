@@ -36,8 +36,11 @@ val testContacts = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EcranContact() {
-    var searchQuery by remember { mutableStateOf("") }
-
+    var recherche by remember { mutableStateOf("") }
+    val contactsFiltres = testContacts.filter { contact ->
+        contact.name.contains(recherche.trim(), ignoreCase = true) ||
+                contact.phone.contains(recherche.trim(), ignoreCase = true)
+    }
     Scaffold(
         topBar = {}, // A RAJOUTER PLUS TARD SI ON MET QUELQUE CHOSE EN HAUT
         floatingActionButton = {
@@ -61,8 +64,8 @@ fun EcranContact() {
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
+                value = recherche,
+                onValueChange = { recherche = it },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
@@ -84,7 +87,7 @@ fun EcranContact() {
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(testContacts) { contact ->
+                items(contactsFiltres) { contact ->
                     ContactCard(contact = contact)
                 }
             }
