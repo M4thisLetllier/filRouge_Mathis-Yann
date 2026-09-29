@@ -6,7 +6,7 @@
         <option name="selectionMode" value="DROPDOWN" />
         <DialogSelection />
       </SelectionState>
-      <SelectionState runConfigName="MainActivity">
+      <SelectionState runConfigName="PreviewEcranAccueil">
         <option name="selectionMode" value="DROPDOWN" />
         <DialogSelection />
       </SelectionState>
