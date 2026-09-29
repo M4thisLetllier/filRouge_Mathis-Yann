@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,27 +31,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Définition des données
-data class ModeleReveil(
-    val id: Int,
-    val nom: String,
-    val heure: String,
-    val dateProchaine: String,
-    val nbAmis: Int,
-    val actifParDefaut: Boolean
-)
+import ca.uqac.c8INF865.test.viewModel.ReveilViewModel
 
-val listeDeReveilsStatistiques = listOf(
-    ModeleReveil(1, "Réveil 1", "07:00", "Mercredi 30 Sept.", 2, true),
-    ModeleReveil(2, "Réveil 2", "08:30", "Mercredi 30 Sept.", 5, true),
-    ModeleReveil(3, "Réveil 3", "09:00", "Jeudi 1 Oct.", 0, false),
-    ModeleReveil(4, "Réveil 4", "10:15", "Vendredi 2 Oct.", 3, true),
-    ModeleReveil(5, "Réveil 5", "14:00", "Lundi 5 Oct.", 1, false)
-)
+
 
 // Écran Principal
 @Composable
 fun EcranAccueilReveil() {
+    val state by viewModel.uiState.collectAsState()
+
     // Scaffold permet de placer facilement la NavBar et le bouton flottant (FAB)
     Scaffold(
         bottomBar = { BarreDeNavigationBas() },
@@ -74,8 +63,15 @@ fun EcranAccueilReveil() {
             verticalArrangement = Arrangement.spacedBy(16.dp), // Espace entre chaque carte
             contentPadding = PaddingValues(vertical = 24.dp) // Espace en haut et en bas de la liste
         ) {
-            items(listeDeReveilsStatistiques) { reveil ->
-                CarteReveil(reveil = reveil)
+            items(reveils   ) { reveil ->
+                reveil ->
+                CarteReveil(
+                    reveil = reveil,
+                    // On fait remonter l'événement de clic vers le ViewModel
+                    onActifChange = { nouvelEtat ->
+                        viewModel.basculerEtatReveil(reveil.id, nouvelEtat)
+                    }
+                )
             }
         }
     }
@@ -85,7 +81,8 @@ fun EcranAccueilReveil() {
 @Composable
 fun CarteReveil(reveil: ModeleReveil) {
     // État local pour le bouton switch
-    var isActif by remember { mutableStateOf(reveil.actifParDefaut) }
+    reveil: ModeleReveil ,
+    onActifChange: (Boolean) -> Unit
 
     // Couleur plus sombre si le réveil est désactivé
     val couleurFond = if (isActif) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant
@@ -161,8 +158,8 @@ fun CarteReveil(reveil: ModeleReveil) {
 
                 // Bouton Activer/Désactiver
                 Switch(
-                    checked = isActif,
-                    onCheckedChange = { isActif = it }
+                    checked = reveil.actifParDefaut,
+                    onCheckedChange = { nouvelEtat -> onActifChange(nouvelEtat) }
                 )
             }
         }
