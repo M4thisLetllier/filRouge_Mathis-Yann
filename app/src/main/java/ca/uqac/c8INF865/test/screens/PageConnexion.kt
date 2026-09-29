@@ -13,23 +13,38 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import ca.uqac.c8INF865.test.R
 import ca.uqac.c8INF865.test.ui.theme.TestTheme
 
 @Composable
 fun EcranConnexion() {
+    var nom by rememberSaveable { mutableStateOf("") }
+    var mdp by rememberSaveable { mutableStateOf("") }
+    val scrollState = rememberScrollState()
     Column(
-        modifier = Modifier .fillMaxSize().padding(16.dp),
+        modifier = Modifier .fillMaxSize().padding(16.dp).verticalScroll(scrollState),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -42,8 +57,8 @@ fun EcranConnexion() {
             horizontalArrangement = Arrangement.Center
         ) {
             OutlinedTextField(
-                value = "",
-                onValueChange = {},
+                value = nom,
+                onValueChange = {nouveauTexte -> nom = nouveauTexte},
                 label = { Text("Nom d'utilisateur") },
                 modifier = Modifier.weight(1f).fillMaxWidth()
             )
@@ -53,10 +68,14 @@ fun EcranConnexion() {
             horizontalArrangement = Arrangement.Center
         ) {
             OutlinedTextField(
-                value = "",
-                onValueChange = {},
+                value = mdp,
+                onValueChange = {nouveauMdp -> mdp = nouveauMdp},
                 label = { Text("Mot de passe") },
-                modifier = Modifier.weight(1f).fillMaxWidth()
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                // Masque les caractères avec des point
+                visualTransformation = PasswordVisualTransformation(),
+                // Adapte le clavier virtuel pour les mots de passe
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
             )
         }
         Spacer(modifier = Modifier.padding(8.dp))
