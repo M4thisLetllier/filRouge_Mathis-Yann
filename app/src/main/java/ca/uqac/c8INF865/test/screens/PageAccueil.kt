@@ -2,9 +2,6 @@ package ca.uqac.c8INF865.test.screens
 
 import androidx.compose.runtime.Composable
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,6 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 
 // Définition des données
 data class ModeleReveil(
@@ -50,7 +50,7 @@ val listeDeReveilsStatistiques = listOf(
 
 // Écran Principal
 @Composable
-fun EcranAccueilReveil() {
+fun EcranAccueilReveil(onRetour: () -> Boolean) {
     // Scaffold permet de placer facilement la NavBar et le bouton flottant (FAB)
     Scaffold(
         bottomBar = { BarreDeNavigationBas() },
@@ -191,6 +191,17 @@ fun CercleAvatar(texte: String? = null) {
 // 5. Barre de navigation en bas
 @Composable
 fun BarreDeNavigationBas() {
+    val navController = rememberNavController()
+    NavHost(
+        navController = navController,
+        startDestination = "accueil"
+    ) {
+        composable("accueil") {
+            EcranConnexion(onVoirDetail = {
+                navController.navigate("detail")
+            })
+        }
+    }
     NavigationBar {
         // Icône 1 : Réveil (Actif par défaut pour cette page)
         NavigationBarItem(
@@ -221,6 +232,6 @@ fun BarreDeNavigationBas() {
 @Composable
 fun PreviewEcranAccueil() {
     MaterialTheme {
-        EcranAccueilReveil()
+        EcranAccueilReveil(onRetour = { false })
     }
 }

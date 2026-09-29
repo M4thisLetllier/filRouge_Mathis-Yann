@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import ca.uqac.c8INF865.test.screens.EcranAccueilReveil
 import ca.uqac.c8INF865.test.screens.EcranConnexion
+import ca.uqac.c8INF865.test.screens.EcranContact
 import ca.uqac.c8INF865.test.ui.theme.TestTheme
 
 class MainActivity : ComponentActivity() {
@@ -17,7 +18,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             TestTheme {
                 //EcranConnexion()
-                EcranAccueilReveil()
+                //EcranAccueilReveil()
+                EcranContact()
             }
         }
     }
