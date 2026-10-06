@@ -26,9 +26,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 
 // Définition des données
 data class ModeleReveil(
@@ -50,10 +47,8 @@ val listeDeReveilsStatistiques = listOf(
 
 // Écran Principal
 @Composable
-fun EcranAccueilReveil(onRetour: () -> Boolean) {
-    // Scaffold permet de placer facilement la NavBar et le bouton flottant (FAB)
+fun EcranAccueilReveil() {
     Scaffold(
-        bottomBar = { BarreDeNavigationBas() },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { /* Action pour ajouter un réveil */ },
@@ -188,50 +183,11 @@ fun CercleAvatar(texte: String? = null) {
     }
 }
 
-// 5. Barre de navigation en bas
-@Composable
-fun BarreDeNavigationBas() {
-    val navController = rememberNavController()
-    NavHost(
-        navController = navController,
-        startDestination = "accueil"
-    ) {
-        composable("accueil") {
-            EcranConnexion(onVoirDetail = {
-                navController.navigate("detail")
-            })
-        }
-    }
-    NavigationBar {
-        // Icône 1 : Réveil (Actif par défaut pour cette page)
-        NavigationBarItem(
-            icon = { Icon(Icons.Filled.Notifications, contentDescription = "Réveils") },
-            label = { Text("Réveils") },
-            selected = true,
-            onClick = { /* Action statique */ }
-        )
-        // Icône 2 : Social
-        NavigationBarItem(
-            icon = { Icon(Icons.Filled.Group, contentDescription = "Social") },
-            label = { Text("Social") },
-            selected = false,
-            onClick = { /* Action statique */ }
-        )
-        // Icône 3 : Microphone (Sons)
-        NavigationBarItem(
-            icon = { Icon(Icons.Filled.Mic, contentDescription = "Sons") },
-            label = { Text("Sons") },
-            selected = false,
-            onClick = { /* Action statique */ }
-        )
-    }
-}
-
 // Permet de voir le résultat directement dans Android Studio sans lancer l'app
 @Preview(showBackground = true)
 @Composable
 fun PreviewEcranAccueil() {
     MaterialTheme {
-        EcranAccueilReveil(onRetour = { false })
+        EcranAccueilReveil()
     }
 }
