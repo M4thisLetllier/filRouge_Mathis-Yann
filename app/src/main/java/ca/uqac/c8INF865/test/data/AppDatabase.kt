@@ -81,6 +81,9 @@ interface ContactDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insererTous(contacts: List<ContactEntity>)
 
+    @Query("DELETE FROM contacts WHERE id = :id")
+    suspend fun supprimer(id: Int)
+
     @Query("SELECT COUNT(*) FROM contacts")
     suspend fun compter(): Int
 }
@@ -98,6 +101,9 @@ interface ReveilContactDao {
 
     @Query("DELETE FROM reveil_contacts WHERE reveilId = :reveilId")
     suspend fun supprimerAssociations(reveilId: Int)
+
+    @Query("DELETE FROM reveil_contacts WHERE contactId = :contactId")
+    suspend fun supprimerAssociationsContact(contactId: Int)
 }
 
 @Dao

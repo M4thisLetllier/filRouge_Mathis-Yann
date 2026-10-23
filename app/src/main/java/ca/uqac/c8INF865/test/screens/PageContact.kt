@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -99,7 +100,10 @@ fun EcranContact(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(contactsFiltres) { contact ->
-                    ContactCard(contact)
+                    ContactCard(
+                        contact = contact,
+                        onSupprimer = { contactViewModel.supprimer(contact) }
+                    )
                 }
             }
         }
@@ -108,7 +112,9 @@ fun EcranContact(
 
 // Ca c'est une brique d'une personne dans la liste, utilisable à l'infini
 @Composable
-fun ContactCard(contact: Contact) {
+fun ContactCard(contact: Contact, onSupprimer: () -> Unit = {}) {
+    var afficherConfirmation by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -135,7 +141,7 @@ fun ContactCard(contact: Contact) {
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = contact.name,
                 )
@@ -144,6 +150,38 @@ fun ContactCard(contact: Contact) {
                     text = contact.phone,
                 )
             }
+
+            IconButton(onClick = { afficherConfirmation = true }) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Supprimer ${contact.name}"
+                )
+            }
         }
+    }
+
+    if (afficherConfirmation) {
+        AlertDialog(
+            onDismissRequest = { afficherConfirmation = false },
+            title = { Text("Supprimer le contact ?") },
+            text = {
+                Text("Voulez-vous vraiment supprimer ${contact.name} ? Cette action est irréversible.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        afficherConfirmation = false
+                        onSupprimer()
+                    }
+                ) {
+                    Text("Supprimer")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { afficherConfirmation = false }) {
+                    Text("Annuler")
+                }
+            }
+        )
     }
 }

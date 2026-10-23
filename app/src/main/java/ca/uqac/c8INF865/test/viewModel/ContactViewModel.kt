@@ -7,13 +7,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ca.uqac.c8INF865.test.data.ContactDao
 import ca.uqac.c8INF865.test.data.ContactEntity
+import ca.uqac.c8INF865.test.data.ReveilContactDao
 import ca.uqac.c8INF865.test.screens.Contact
 import ca.uqac.c8INF865.test.screens.testContacts
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class ContactViewModel(private val dao: ContactDao) : ViewModel() {
+class ContactViewModel(
+    private val dao: ContactDao,
+    private val associationDao: ReveilContactDao
+) : ViewModel() {
     var recherche by mutableStateOf("")
         private set
 
@@ -44,5 +48,12 @@ class ContactViewModel(private val dao: ContactDao) : ViewModel() {
 
     fun modifierRecherche(nouvelleRecherche: String) {
         recherche = nouvelleRecherche
+    }
+
+    fun supprimer(contact: Contact) {
+        viewModelScope.launch {
+            associationDao.supprimerAssociationsContact(contact.id)
+            dao.supprimer(contact.id)
+        }
     }
 }
