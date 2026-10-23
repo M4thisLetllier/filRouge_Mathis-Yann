@@ -256,6 +256,7 @@ private fun ListeSons(sons: List<SonEntity>, onSupprimer: (SonEntity) -> Unit) {
 @Composable
 private fun CarteSon(son: SonEntity, onSupprimer: (SonEntity) -> Unit) {
     var lecture by remember(son.chemin) { mutableStateOf(false) }
+    var afficherConfirmation by remember { mutableStateOf(false) }
     val lecteur = remember(son.chemin) {
         MediaPlayer().apply {
             setDataSource(son.chemin)
@@ -284,13 +285,41 @@ private fun CarteSon(son: SonEntity, onSupprimer: (SonEntity) -> Unit) {
                 )
             }
             Text(son.nom, Modifier.weight(1f))
-            IconButton(onClick = {
-                if (lecture) lecteur.stop()
-                onSupprimer(son)
-                File(son.chemin).delete()
-            }) {
+            IconButton(onClick = { afficherConfirmation = true }) {
                 Icon(Icons.Default.Delete, contentDescription = "Supprimer")
             }
         }
+    }
+
+    if (afficherConfirmation) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { afficherConfirmation = false },
+            title = { Text("Supprimer la note vocale ?") },
+            text = {
+                Text("Voulez-vous vraiment supprimer ${son.nom} ? Cette action est irréversible.")
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        if (lecture) {
+                            lecteur.stop()
+                            lecture = false
+                        }
+                        afficherConfirmation = false
+                        onSupprimer(son)
+                        File(son.chemin).delete()
+                    }
+                ) {
+                    Text("Supprimer")
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = { afficherConfirmation = false }
+                ) {
+                    Text("Annuler")
+                }
+            }
+        )
     }
 }
