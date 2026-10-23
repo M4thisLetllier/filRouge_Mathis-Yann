@@ -3,6 +3,7 @@ package ca.uqac.c8INF865.test.data
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Entity
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -35,6 +36,14 @@ data class ContactEntity(
 data class ReveilContactEntity(
     val reveilId: Int,
     val contactId: Int
+)
+
+@Entity(tableName = "sons")
+data class SonEntity(
+    @androidx.room.PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val nom: String,
+    val chemin: String,
+    val dateCreation: Long
 )
 
 @Dao
@@ -91,15 +100,28 @@ interface ReveilContactDao {
     suspend fun supprimerAssociations(reveilId: Int)
 }
 
+@Dao
+interface SonDao {
+    @Query("SELECT * FROM sons ORDER BY dateCreation DESC")
+    fun observerTous(): Flow<List<SonEntity>>
+
+    @Insert
+    suspend fun inserer(son: SonEntity)
+
+    @Delete
+    suspend fun supprimer(son: SonEntity)
+}
+
 @Database(
-    entities = [ReveilEntity::class, ContactEntity::class, ReveilContactEntity::class],
-    version = 2,
+    entities = [ReveilEntity::class, ContactEntity::class, ReveilContactEntity::class, SonEntity::class],
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun reveilDao(): ReveilDao
     abstract fun contactDao(): ContactDao
     abstract fun reveilContactDao(): ReveilContactDao
+    abstract fun sonDao(): SonDao
 
     companion object {
         @Volatile
@@ -113,6 +135,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "reveils_contacts.db"
                 )
                     .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_2_3)
                     .build().also { instance = it }
             }
 
@@ -122,6 +145,16 @@ abstract class AppDatabase : RoomDatabase() {
                     "CREATE TABLE IF NOT EXISTS reveil_contacts " +
                         "(reveilId INTEGER NOT NULL, contactId INTEGER NOT NULL, " +
                         "PRIMARY KEY(reveilId, contactId))"
+                )
+            }
+        }
+
+        private val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS sons " +
+                        "(id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "nom TEXT NOT NULL, chemin TEXT NOT NULL, dateCreation INTEGER NOT NULL)"
                 )
             }
         }

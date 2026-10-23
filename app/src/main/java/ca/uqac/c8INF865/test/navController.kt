@@ -1,10 +1,7 @@
 package ca.uqac.c8INF865.test
 
 import androidx.compose.runtime.Composable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Mic
@@ -22,6 +19,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import ca.uqac.c8INF865.test.screens.EcranAccueilReveil
 import ca.uqac.c8INF865.test.screens.EcranContact
+import ca.uqac.c8INF865.test.screens.EcranSons
 
 @Composable
 fun MonApp() {
@@ -81,13 +79,3 @@ private data class BottomBarItem(
     val label: String,
     val icon: androidx.compose.ui.graphics.vector.ImageVector
 )
-
-@Composable
-private fun EcranSons() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text("Sons")
-    }
-}
