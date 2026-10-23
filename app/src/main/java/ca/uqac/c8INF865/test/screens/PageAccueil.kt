@@ -1,7 +1,5 @@
 package ca.uqac.c8INF865.test.screens
 
-import androidx.compose.runtime.Composable
-
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,15 +26,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
-import ca.uqac.c8INF865.test.data.AppDatabase
-import ca.uqac.c8INF865.test.viewModel.AppViewModelFactory
 import ca.uqac.c8INF865.test.viewModel.ContactViewModel
 import ca.uqac.c8INF865.test.viewModel.ReveilViewModel
-import androidx.compose.ui.platform.LocalContext
 
 // Définition des données
 data class ModeleReveil(
-    val id: Int,
+    val id: String,
     val nom: String,
     val heure: String,
     val dateProchaine: String,
@@ -44,26 +39,14 @@ data class ModeleReveil(
     val actifParDefaut: Boolean
 )
 
-val listeDeReveilsStatistiques = listOf(
-    ModeleReveil(1, "Réveil 1", "07:00", "Mercredi 30 Sept.", 2, true),
-    ModeleReveil(2, "Réveil 2", "08:30", "Mercredi 30 Sept.", 5, true),
-    ModeleReveil(3, "Réveil 3", "09:00", "Jeudi 1 Oct.", 0, false),
-    ModeleReveil(4, "Réveil 4", "10:15", "Vendredi 2 Oct.", 3, true),
-    ModeleReveil(5, "Réveil 5", "14:00", "Lundi 5 Oct.", 1, false)
-)
-
 // Écran Principal
 @Composable
 fun EcranAccueilReveil(
-    reveilViewModel: ReveilViewModel = viewModel(
-        factory = AppViewModelFactory(AppDatabase.getInstance(LocalContext.current))
-    )
+    reveilViewModel: ReveilViewModel = viewModel(), // Instanciation simplifiée sans Room
+    contactViewModel: ContactViewModel = viewModel()
 ) {
     val reveils by reveilViewModel.uiState.collectAsState()
     val contactsParReveil by reveilViewModel.contactsParReveil.collectAsState()
-    val contactViewModel: ContactViewModel = viewModel(
-        factory = AppViewModelFactory(AppDatabase.getInstance(LocalContext.current))
-    )
     val contacts by contactViewModel.contacts.collectAsState()
     var afficherAjout by remember { mutableStateOf(false) }
 
@@ -78,15 +61,14 @@ fun EcranAccueilReveil(
             }
         }
     ) { paddingValues ->
-        // LazyColumn crée la liste défilante verticalement
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
-                .padding(paddingValues) // Respecte l'espace de la bottom bar
-                .padding(horizontal = 16.dp), // Marge sur les côtés
-            verticalArrangement = Arrangement.spacedBy(16.dp), // Espace entre chaque carte
-            contentPadding = PaddingValues(vertical = 24.dp) // Espace en haut et en bas de la liste
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(vertical = 24.dp)
         ) {
             items(reveils.listeReveils) { reveil ->
                 CarteReveil(
@@ -115,16 +97,16 @@ fun EcranAccueilReveil(
     }
 }
 
-//Composant graphique pour un réveil
+// Composant graphique pour un réveil
 @Composable
 fun CarteReveil(
     reveil: ModeleReveil,
     contacts: List<Contact> = emptyList(),
-    contactsAssocies: Set<Int> = emptySet(),
+    contactsAssocies: Set<String> = emptySet(), // Passage en String pour Firestore
     onEtatChange: (Boolean) -> Unit = {},
     onModifier: (String, String) -> Unit = { _, _ -> },
     onSupprimer: () -> Unit = {},
-    onContactChange: (Int, Boolean) -> Unit = { _, _ -> }
+    onContactChange: (String, Boolean) -> Unit = { _, _ -> } // Passage en String
 ) {
     val isActif = reveil.actifParDefaut
     val nombreAmis = contactsAssocies.size
@@ -133,20 +115,18 @@ fun CarteReveil(
     var nom by remember(reveil.nom) { mutableStateOf(reveil.nom) }
     var heure by remember(reveil.heure) { mutableStateOf(reveil.heure) }
 
-    // Couleur plus sombre si le réveil est désactivé
     val couleurFond = if (isActif) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant
 
     Card(
-        shape = RoundedCornerShape(16.dp), // Bords arrondis
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = couleurFond),
-        border = BorderStroke(1.dp, Color.LightGray), // Contour rectangulaire léger
+        border = BorderStroke(1.dp, Color.LightGray),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { estOuvert = !estOuvert }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Ligne 1 : Nom du réveil
             Text(
                 text = reveil.nom,
                 fontSize = 18.sp,
@@ -156,7 +136,6 @@ fun CarteReveil(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Ligne 2 : Heure (gauche) et Date (droite)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -178,36 +157,29 @@ fun CarteReveil(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Ligne 3 : Avatars des amis (gauche) et Switch (droite)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Section des amis partagés
                 Row(
-                    // Espacement négatif permet de chevaucher les icônes
                     horizontalArrangement = Arrangement.spacedBy((-8).dp)
                 ) {
                     if (nombreAmis == 0) {
                         Text(text = "Personnel", fontSize = 12.sp, color = Color.Gray)
                     } else {
-                        //on affiche seulement 3 amis, au dela on ajoute (...)
                         val maxAffiches = 3
                         val nbAffiches = if (nombreAmis > maxAffiches) maxAffiches else nombreAmis
 
-                        // Dessine les ronds pour les amis
                         for (i in 0 until nbAffiches) {
                             CercleAvatar()
                         }
-                        // Si dépasse la capacité (3), affiche le bouton "..."
                         if (nombreAmis > maxAffiches) {
                             CercleAvatar(texte = "...")
                         }
                     }
                 }
 
-                // Bouton Activer/Désactiver
                 Switch(
                     checked = isActif,
                     onCheckedChange = onEtatChange
@@ -253,7 +225,9 @@ fun CarteReveil(
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Text("Personnes liées", fontWeight = FontWeight.Bold)
-                val contactsAssociesDetails = contacts.filter { it.id in contactsAssocies }
+
+                // Adaptation pour comparer le String de Firebase avec l'ID du contact
+                val contactsAssociesDetails = contacts.filter { it.id.toString() in contactsAssocies }
                 if (contactsAssociesDetails.isEmpty()) {
                     Text("Aucun contact lié.", color = Color.Gray)
                 } else {
@@ -263,7 +237,7 @@ fun CarteReveil(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(contact.name, modifier = Modifier.weight(1f))
-                            TextButton(onClick = { onContactChange(contact.id, false) }) {
+                            TextButton(onClick = { onContactChange(contact.id.toString(), false) }) {
                                 Text("Retirer")
                             }
                         }
@@ -272,7 +246,7 @@ fun CarteReveil(
                 var afficherAjoutContact by remember { mutableStateOf(false) }
                 OutlinedButton(
                     onClick = { afficherAjoutContact = true },
-                    enabled = contacts.any { it.id !in contactsAssocies },
+                    enabled = contacts.any { it.id.toString() !in contactsAssocies },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null)
@@ -281,7 +255,7 @@ fun CarteReveil(
                 }
                 if (afficherAjoutContact) {
                     SelectionContacts(
-                        contacts = contacts.filter { it.id !in contactsAssocies },
+                        contacts = contacts.filter { it.id.toString() !in contactsAssocies },
                         onDismiss = { afficherAjoutContact = false },
                         onConfirm = { ids ->
                             ids.forEach { onContactChange(it, true) }
@@ -430,9 +404,9 @@ private fun SelecteurHeure(
 private fun SelectionContacts(
     contacts: List<Contact>,
     onDismiss: () -> Unit,
-    onConfirm: (Set<Int>) -> Unit
+    onConfirm: (Set<String>) -> Unit // Passage en String
 ) {
-    var selection by remember { mutableStateOf(emptySet<Int>()) }
+    var selection by remember { mutableStateOf(emptySet<String>()) } // Passage en String
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -448,12 +422,12 @@ private fun SelectionContacts(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Checkbox(
-                                checked = contact.id in selection,
+                                checked = contact.id.toString() in selection,
                                 onCheckedChange = { coche ->
                                     selection = if (coche) {
-                                        selection + contact.id
+                                        selection + contact.id.toString()
                                     } else {
-                                        selection - contact.id
+                                        selection - contact.id.toString()
                                     }
                                 }
                             )
@@ -477,7 +451,6 @@ private fun SelectionContacts(
     )
 }
 
-// Petit composant pour dessiner les "bulles" d'amis
 @Composable
 fun CercleAvatar(texte: String? = null) {
     Box(
@@ -485,7 +458,7 @@ fun CercleAvatar(texte: String? = null) {
             .size(36.dp)
             .clip(CircleShape)
             .background(Color.LightGray)
-            .border(2.dp, Color.White, CircleShape), // Bordure blanche pour séparer les cercles chevauchés
+            .border(2.dp, Color.White, CircleShape),
         contentAlignment = Alignment.Center
     ) {
         if (texte != null) {
@@ -496,7 +469,6 @@ fun CercleAvatar(texte: String? = null) {
     }
 }
 
-// Permet de voir le résultat directement dans Android Studio sans lancer l'app
 @Preview(showBackground = true)
 @Composable
 fun PreviewEcranAccueil() {

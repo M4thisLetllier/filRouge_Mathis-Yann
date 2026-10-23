@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -16,13 +17,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.ui.platform.LocalContext
-import ca.uqac.c8INF865.test.data.AppDatabase
-import ca.uqac.c8INF865.test.viewModel.AppViewModelFactory
 import ca.uqac.c8INF865.test.viewModel.ContactViewModel
-
 
 // Structure d'un contact
 data class Contact(
@@ -31,33 +29,26 @@ data class Contact(
     val phone: String
 )
 
-// Pour les tests tant qu'on a pas de bdd
-val testContacts = listOf(
-    Contact(1, "Alexandre Tremblay", "+1 (418)-555-0123"),
-    Contact(2, "Marie Gagnon", "+1 (581)-555-0456"),
-    Contact(3, "Gabriel Côté", "+1 (418)-555-0789"),
-    Contact(4, "Émilie Bouchard", "+1 (581)-555-0234"),
-    Contact(5, "Thomas Girard", "+1 (367)-555-0567")
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EcranContact(
-    contactViewModel: ContactViewModel = viewModel(
-        factory = AppViewModelFactory(AppDatabase.getInstance(LocalContext.current))
-    )
+    contactViewModel: ContactViewModel = viewModel() // Instanciation autonome sans Room
 ) {
     val contacts by contactViewModel.contacts.collectAsState()
     val texteRecherche = contactViewModel.recherche.trim()
+
+    // Gérer l'affichage du formulaire d'ajout
+    var afficherAjoutContact by remember { mutableStateOf(false) }
+
     val contactsFiltres = contacts.filter { contact ->
         contact.name.contains(texteRecherche, ignoreCase = true) ||
-            contact.phone.contains(texteRecherche, ignoreCase = true)
+                contact.phone.contains(texteRecherche, ignoreCase = true)
     }
+
     Scaffold(
-        topBar = {}, // A RAJOUTER PLUS TARD SI ON MET QUELQUE CHOSE EN HAUT
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { },
+                onClick = { afficherAjoutContact = true },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White
             ) {
@@ -108,9 +99,20 @@ fun EcranContact(
             }
         }
     }
+
+    // Affichage du formulaire d'ajout par-dessus l'écran
+    if (afficherAjoutContact) {
+        FormulaireContact(
+            onDismiss = { afficherAjoutContact = false },
+            onConfirm = { nom, telephone ->
+                contactViewModel.ajouterContact(nom, telephone)
+                afficherAjoutContact = false
+            }
+        )
+    }
 }
 
-// Ca c'est une brique d'une personne dans la liste, utilisable à l'infini
+// Brique d'une personne dans la liste
 @Composable
 fun ContactCard(contact: Contact, onSupprimer: () -> Unit = {}) {
     var afficherConfirmation by remember { mutableStateOf(false) }
@@ -184,4 +186,50 @@ fun ContactCard(contact: Contact, onSupprimer: () -> Unit = {}) {
             }
         )
     }
+}
+
+// Boîte de dialogue pour ajouter un nouveau contact
+@Composable
+private fun FormulaireContact(
+    onDismiss: () -> Unit,
+    onConfirm: (String, String) -> Unit
+) {
+    var nom by remember { mutableStateOf("") }
+    var telephone by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Ajouter un contact") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = nom,
+                    onValueChange = { nom = it },
+                    label = { Text("Nom du contact") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = telephone,
+                    onValueChange = { telephone = it },
+                    label = { Text("Numéro de téléphone") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(nom, telephone) },
+                enabled = nom.isNotBlank() && telephone.isNotBlank()
+            ) {
+                Text("Ajouter")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Annuler") }
+        }
+    )
 }

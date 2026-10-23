@@ -55,7 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ca.uqac.c8INF865.test.data.AppDatabase
 import ca.uqac.c8INF865.test.data.SonEntity
-import ca.uqac.c8INF865.test.viewModel.AppViewModelFactory
+//import ca.uqac.c8INF865.test.viewModel.AppViewModelFactory
 import ca.uqac.c8INF865.test.viewModel.SonViewModel
 import java.io.File
 import java.text.SimpleDateFormat
@@ -65,7 +65,7 @@ import java.util.Locale
 @Composable
 fun EcranSons(
     sonViewModel: SonViewModel = viewModel(
-        factory = AppViewModelFactory(AppDatabase.getInstance(LocalContext.current))
+        //factory = AppViewModelFactory(AppDatabase.getInstance(LocalContext.current))
     )
 ) {
     val context = LocalContext.current

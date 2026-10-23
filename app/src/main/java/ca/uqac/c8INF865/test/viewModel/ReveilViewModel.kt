@@ -1,89 +1,107 @@
 package ca.uqac.c8INF865.test.viewModel
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import ca.uqac.c8INF865.test.data.ReveilDao
-import ca.uqac.c8INF865.test.data.ReveilEntity
-import ca.uqac.c8INF865.test.data.ReveilContactDao
-import ca.uqac.c8INF865.test.data.ReveilContactEntity
 import ca.uqac.c8INF865.test.screens.ModeleReveil
-import ca.uqac.c8INF865.test.screens.listeDeReveilsStatistiques
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 
-// État global de la page d'accueil
 data class AccueilUiState(
     val listeReveils: List<ModeleReveil> = emptyList()
 )
 
-class ReveilViewModel(
-    private val dao: ReveilDao,
-    private val associationDao: ReveilContactDao
-) : ViewModel() {
+class ReveilViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(AccueilUiState())
     val uiState: StateFlow<AccueilUiState> = _uiState.asStateFlow()
-    private val _contactsParReveil = MutableStateFlow<Map<Int, Set<Int>>>(emptyMap())
-    val contactsParReveil: StateFlow<Map<Int, Set<Int>>> = _contactsParReveil.asStateFlow()
+
+    // On garde un StateFlow pour les membres (UID) liés à un ID de réveil
+    private val _contactsParReveil = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
+    val contactsParReveil: StateFlow<Map<String, Set<String>>> = _contactsParReveil.asStateFlow()
+
+    private val db = FirebaseFirestore.getInstance()
+    private val auth = FirebaseAuth.getInstance()
 
     init {
-        viewModelScope.launch {
-            if (dao.compter() == 0) {
-                dao.insererTous(listeDeReveilsStatistiques.map { it.toEntity() })
-            }
-        }
-        viewModelScope.launch {
-            dao.observerTous().collect { reveils ->
-                _uiState.value = AccueilUiState(reveils.map { it.toModel() })
-            }
-        }
-        viewModelScope.launch {
-            associationDao.observerToutesLesAssociations().collect { associations ->
-                _contactsParReveil.value = associations.groupBy { it.reveilId }
-                    .mapValues { (_, values) -> values.map { it.contactId }.toSet() }
-            }
-        }
+        ecouterReveils()
     }
 
-    fun basculerEtatReveil(idReveil: Int, estActif: Boolean) {
-        viewModelScope.launch {
-            dao.modifierEtat(idReveil, estActif)
-        }
+    private fun ecouterReveils() {
+        val uid = auth.currentUser?.uid ?: return
+
+        // On écoute les réveils où je suis le créateur OU membre
+        db.collection("reveils")
+            .whereEqualTo("createur_id", uid)
+            .addSnapshotListener { snapshot, erreur ->
+                if (erreur != null || snapshot == null) return@addSnapshotListener
+
+                val liste = mutableListOf<ModeleReveil>()
+                val mapMembres = mutableMapOf<String, Set<String>>()
+
+                for (doc in snapshot) {
+                    val membres = doc.get("membres_ids") as? List<String> ?: emptyList()
+                    mapMembres[doc.id] = membres.toSet()
+
+                    liste.add(
+                        ModeleReveil(
+                            id = doc.id, // Mettre ModeleReveil(id: String)
+                            nom = doc.getString("nom") ?: "Sans nom",
+                            heure = doc.getString("heure") ?: "00:00",
+                            dateProchaine = doc.getString("dateProchaine") ?: "À venir",
+                            nbAmis = membres.size,
+                            actifParDefaut = doc.getBoolean("actif") ?: true
+                        )
+                    )
+                }
+                _uiState.value = AccueilUiState(liste)
+                _contactsParReveil.value = mapMembres
+            }
+    }
+
+    fun basculerEtatReveil(idReveil: String, estActif: Boolean) {
+        db.collection("reveils").document(idReveil).update("actif", estActif)
     }
 
     fun ajouterReveil(nom: String, heure: String) {
-        viewModelScope.launch {
-            val id = dao.prochainId()
-            dao.inserer(ReveilEntity(id, nom.trim(), heure, "À venir", 0, true))
-        }
+        val uid = auth.currentUser?.uid ?: return
+        val nouveauReveil = hashMapOf(
+            "nom" to nom.trim(),
+            "heure" to heure,
+            "dateProchaine" to "À venir",
+            "createur_id" to uid,
+            "membres_ids" to emptyList<String>(),
+            "actif" to true
+        )
+        db.collection("reveils").add(nouveauReveil)
     }
 
-    fun modifierReveil(id: Int, nom: String, heure: String) {
-        viewModelScope.launch {
-            dao.modifierDetails(id, nom.trim(), heure)
-        }
+    fun modifierReveil(id: String, nom: String, heure: String) {
+        db.collection("reveils").document(id).update(
+            mapOf(
+                "nom" to nom.trim(),
+                "heure" to heure
+            )
+        )
     }
 
-    fun supprimerReveil(id: Int) {
-        viewModelScope.launch {
-            associationDao.supprimerAssociations(id)
-            dao.supprimer(id)
-        }
+    fun supprimerReveil(id: String) {
+        db.collection("reveils").document(id).delete()
     }
 
-    fun basculerContact(idReveil: Int, idContact: Int, associe: Boolean) {
-        viewModelScope.launch {
-            if (associe) {
-                associationDao.associer(ReveilContactEntity(idReveil, idContact))
-            } else {
-                associationDao.dissocier(idReveil, idContact)
+    // Associer un ID Firebase (String) au lieu d'un Int
+    fun basculerContact(idReveil: String, idContact: String, associe: Boolean) {
+        val ref = db.collection("reveils").document(idReveil)
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(ref)
+            val membres = (snapshot.get("membres_ids") as? List<String>)?.toMutableList() ?: mutableListOf()
+
+            if (associe && !membres.contains(idContact)) {
+                membres.add(idContact)
+            } else if (!associe) {
+                membres.remove(idContact)
             }
+            transaction.update(ref, "membres_ids", membres)
         }
     }
 }
-
-private fun ModeleReveil.toEntity() = ReveilEntity(id, nom, heure, dateProchaine, nbAmis, actifParDefaut)
-
-private fun ReveilEntity.toModel() =
-    ModeleReveil(id, nom, heure, dateProchaine, nbAmis, actif)

@@ -5,55 +5,69 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import ca.uqac.c8INF865.test.data.ContactDao
-import ca.uqac.c8INF865.test.data.ContactEntity
-import ca.uqac.c8INF865.test.data.ReveilContactDao
 import ca.uqac.c8INF865.test.screens.Contact
-import ca.uqac.c8INF865.test.screens.testContacts
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class ContactViewModel(
-    private val dao: ContactDao,
-    private val associationDao: ReveilContactDao
-) : ViewModel() {
+class ContactViewModel : ViewModel() {
     var recherche by mutableStateOf("")
         private set
 
     private val _contacts = MutableStateFlow<List<Contact>>(emptyList())
     val contacts = _contacts.asStateFlow()
 
-    val contactsFiltres: List<Contact>
-        get() {
-            val texteRecherche = recherche.trim()
-            return _contacts.value.filter { contact ->
-                contact.name.contains(texteRecherche, ignoreCase = true) ||
-                    contact.phone.contains(texteRecherche, ignoreCase = true)
-            }
-        }
+    private val db = FirebaseFirestore.getInstance()
+    private val auth = FirebaseAuth.getInstance()
 
     init {
-        viewModelScope.launch {
-            if (dao.compter() == 0) {
-                dao.insererTous(testContacts.map { ContactEntity(it.id, it.name, it.phone) })
+        ecouterContacts()
+    }
+
+    private fun ecouterContacts() {
+        val uid = auth.currentUser?.uid ?: return
+
+        // On suppose que chaque utilisateur gère sa propre liste de contacts
+        db.collection("utilisateurs").document(uid).collection("contacts")
+            .addSnapshotListener { snapshot, erreur ->
+                if (erreur != null || snapshot == null) return@addSnapshotListener
+
+                val liste = snapshot.documents.mapNotNull { doc ->
+                    Contact(
+                        id = doc.getString("id")?.hashCode() ?: 0, // Firestore utilise des Strings pour les ID
+                        name = doc.getString("name") ?: "",
+                        phone = doc.getString("phone") ?: ""
+                    )
+                }
+                _contacts.value = liste
             }
-        }
-        viewModelScope.launch {
-            dao.observerTous().collect { contacts ->
-                _contacts.value = contacts.map { Contact(it.id, it.name, it.phone) }
-            }
-        }
     }
 
     fun modifierRecherche(nouvelleRecherche: String) {
         recherche = nouvelleRecherche
     }
 
+    fun ajouterContact(nom: String, telephone: String) {
+        val uid = auth.currentUser?.uid ?: return
+        val nouveauContact = hashMapOf(
+            "name" to nom,
+            "phone" to telephone
+        )
+        db.collection("utilisateurs").document(uid).collection("contacts").add(nouveauContact)
+    }
+
     fun supprimer(contact: Contact) {
-        viewModelScope.launch {
-            associationDao.supprimerAssociationsContact(contact.id)
-            dao.supprimer(contact.id)
-        }
+        val uid = auth.currentUser?.uid ?: return
+        // Idéalement, il faut retrouver l'ID du document Firestore
+        db.collection("utilisateurs").document(uid).collection("contacts")
+            .whereEqualTo("name", contact.name)
+            .get()
+            .addOnSuccessListener { query ->
+                for (doc in query) {
+                    doc.reference.delete()
+                }
+            }
     }
 }
