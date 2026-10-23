@@ -13,7 +13,7 @@ class AppViewModelFactory(
             modelClass.isAssignableFrom(ReveilViewModel::class.java) ->
                 ReveilViewModel(database.reveilDao(), database.reveilContactDao()) as T
             modelClass.isAssignableFrom(ContactViewModel::class.java) ->
-                ContactViewModel(database.contactDao()) as T
+                ContactViewModel(database.contactDao(), database.reveilContactDao()) as T
             modelClass.isAssignableFrom(SonViewModel::class.java) ->
                 SonViewModel(database.sonDao()) as T
             else -> throw IllegalArgumentException("ViewModel inconnu: ${modelClass.name}")
