@@ -17,6 +17,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.platform.LocalContext
+import ca.uqac.c8INF865.test.data.AppDatabase
+import ca.uqac.c8INF865.test.viewModel.AppViewModelFactory
 import ca.uqac.c8INF865.test.viewModel.ContactViewModel
 
 
@@ -38,7 +41,17 @@ val testContacts = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EcranContact(contactViewModel: ContactViewModel = viewModel()) {
+fun EcranContact(
+    contactViewModel: ContactViewModel = viewModel(
+        factory = AppViewModelFactory(AppDatabase.getInstance(LocalContext.current))
+    )
+) {
+    val contacts by contactViewModel.contacts.collectAsState()
+    val texteRecherche = contactViewModel.recherche.trim()
+    val contactsFiltres = contacts.filter { contact ->
+        contact.name.contains(texteRecherche, ignoreCase = true) ||
+            contact.phone.contains(texteRecherche, ignoreCase = true)
+    }
     Scaffold(
         topBar = {}, // A RAJOUTER PLUS TARD SI ON MET QUELQUE CHOSE EN HAUT
         floatingActionButton = {
@@ -85,7 +98,7 @@ fun EcranContact(contactViewModel: ContactViewModel = viewModel()) {
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(contactViewModel.contactsFiltres) { contact ->
+                items(contactsFiltres) { contact ->
                     ContactCard(contact)
                 }
             }
