@@ -6,46 +6,14 @@ import android.media.MediaPlayer
 import android.media.MediaRecorder
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,9 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import ca.uqac.c8INF865.test.data.AppDatabase
-import ca.uqac.c8INF865.test.data.SonEntity
-//import ca.uqac.c8INF865.test.viewModel.AppViewModelFactory
+import ca.uqac.c8INF865.test.viewModel.Son
 import ca.uqac.c8INF865.test.viewModel.SonViewModel
 import java.io.File
 import java.text.SimpleDateFormat
@@ -64,9 +30,7 @@ import java.util.Locale
 
 @Composable
 fun EcranSons(
-    sonViewModel: SonViewModel = viewModel(
-        //factory = AppViewModelFactory(AppDatabase.getInstance(LocalContext.current))
-    )
+    sonViewModel: SonViewModel = viewModel() // Instanciation autonome
 ) {
     val context = LocalContext.current
     val sons by sonViewModel.sons.collectAsState()
@@ -159,12 +123,13 @@ fun EcranSons(
                     },
                     onSauvegarder = {
                         fichierTemporaire?.let { fichier ->
-                            sonViewModel.ajouter(
+                            // Envoi vers Firebase Storage
+                            sonViewModel.uploaderSon(
                                 nom = "Enregistrement " + SimpleDateFormat(
                                     "dd/MM/yyyy HH:mm",
                                     Locale.getDefault()
                                 ).format(Date()),
-                                chemin = fichier.absolutePath
+                                cheminLocal = fichier.absolutePath
                             )
                         }
                         fichierTemporaire = null
@@ -235,7 +200,7 @@ private fun Enregistreur(
 }
 
 @Composable
-private fun ListeSons(sons: List<SonEntity>, onSupprimer: (SonEntity) -> Unit) {
+private fun ListeSons(sons: List<Son>, onSupprimer: (Son) -> Unit) {
     if (sons.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("Aucun enregistrement", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -254,19 +219,26 @@ private fun ListeSons(sons: List<SonEntity>, onSupprimer: (SonEntity) -> Unit) {
 }
 
 @Composable
-private fun CarteSon(son: SonEntity, onSupprimer: (SonEntity) -> Unit) {
-    var lecture by remember(son.chemin) { mutableStateOf(false) }
+private fun CarteSon(son: Son, onSupprimer: (Son) -> Unit) {
+    var lecture by remember(son.url) { mutableStateOf(false) }
     var afficherConfirmation by remember { mutableStateOf(false) }
-    val lecteur = remember(son.chemin) {
+
+    // Le MediaPlayer lit désormais directement l'URL Firebase
+    val lecteur = remember(son.url) {
         MediaPlayer().apply {
-            setDataSource(son.chemin)
-            prepare()
+            setDataSource(son.url)
+            prepareAsync() // Asynchrone car téléchargement réseau
+            setOnPreparedListener {
+                // Optionnel : Activer le bouton play seulement quand prêt
+            }
             setOnCompletionListener { lecture = false }
         }
     }
+
     DisposableEffect(lecteur) {
         onDispose { lecteur.release() }
     }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -307,7 +279,6 @@ private fun CarteSon(son: SonEntity, onSupprimer: (SonEntity) -> Unit) {
                         }
                         afficherConfirmation = false
                         onSupprimer(son)
-                        File(son.chemin).delete()
                     }
                 ) {
                     Text("Supprimer")
