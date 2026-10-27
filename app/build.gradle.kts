@@ -49,13 +49,15 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
-    // Le gestionnaire de versions
-    implementation(platform("com.google.firebase:firebase-bom:32.8.1"))
 
-    // Les bibliothèques standard
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-firestore")
-    implementation("com.google.firebase:firebase-storage")
+    // Supabase (Base de données, Storage et Authentification)
+    val supabaseVersion = "2.6.1"
+    implementation("io.github.jan-tennert.supabase:postgrest-kt:$supabaseVersion") // Pour la BDD
+    implementation("io.github.jan-tennert.supabase:storage-kt:$supabaseVersion") // Pour les fichiers
+    implementation("io.github.jan-tennert.supabase:auth-kt:$supabaseVersion") // Pour les comptes utilisateurs
+
+    // Ktor (Requis par Supabase pour communiquer avec internet sur Android)
+    implementation("io.ktor:ktor-client-android:2.3.12")
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
