@@ -50,13 +50,13 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
 
-    // Supabase (Base de données, Storage et Authentification)
+    /// Supabase
     val supabaseVersion = "2.6.1"
-    implementation("io.github.jan-tennert.supabase:postgrest-kt:$supabaseVersion") // Pour la BDD
-    implementation("io.github.jan-tennert.supabase:storage-kt:$supabaseVersion") // Pour les fichiers
-    implementation("io.github.jan-tennert.supabase:auth-kt:$supabaseVersion") // Pour les comptes utilisateurs
+    implementation("io.github.jan-tennert.supabase:postgrest-kt:$supabaseVersion")
+    implementation("io.github.jan-tennert.supabase:storage-kt:$supabaseVersion")
+    implementation("io.github.jan-tennert.supabase:gotrue-kt:$supabaseVersion") // Correction ici (gotrue au lieu de auth)
 
-    // Ktor (Requis par Supabase pour communiquer avec internet sur Android)
+    // Ktor (Requis par Supabase)
     implementation("io.ktor:ktor-client-android:2.3.12")
 
     testImplementation(libs.junit)

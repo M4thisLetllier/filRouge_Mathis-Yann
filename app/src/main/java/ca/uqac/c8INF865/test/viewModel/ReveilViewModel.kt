@@ -1,107 +1,83 @@
 package ca.uqac.c8INF865.test.viewModel
 
 import androidx.lifecycle.ViewModel
-import ca.uqac.c8INF865.test.screens.ModeleReveil
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
+import androidx.lifecycle.viewModelScope
+import ca.uqac.c8INF865.test.data.Reveil
+import ca.uqac.c8INF865.test.network.Supabase
+import ca.uqac.c8INF865.test.repository.ReveilRepository
+import io.github.jan.supabase.gotrue.auth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 data class AccueilUiState(
-    val listeReveils: List<ModeleReveil> = emptyList()
+    val listeReveils: List<Reveil> = emptyList()
 )
 
 class ReveilViewModel : ViewModel() {
+    private val repository = ReveilRepository()
+
     private val _uiState = MutableStateFlow(AccueilUiState())
     val uiState: StateFlow<AccueilUiState> = _uiState.asStateFlow()
 
-    // On garde un StateFlow pour les membres (UID) liés à un ID de réveil
     private val _contactsParReveil = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
     val contactsParReveil: StateFlow<Map<String, Set<String>>> = _contactsParReveil.asStateFlow()
 
-    private val db = FirebaseFirestore.getInstance()
-    private val auth = FirebaseAuth.getInstance()
-
     init {
-        ecouterReveils()
+        chargerReveils()
     }
 
-    private fun ecouterReveils() {
-        val uid = auth.currentUser?.uid ?: return
+    private fun chargerReveils() {
+        viewModelScope.launch {
+            val userId = Supabase.client.auth.currentUserOrNull()?.id ?: return@launch
 
-        // On écoute les réveils où je suis le créateur OU membre
-        db.collection("reveils")
-            .whereEqualTo("createur_id", uid)
-            .addSnapshotListener { snapshot, erreur ->
-                if (erreur != null || snapshot == null) return@addSnapshotListener
+            // 1. Charger les réveils
+            val reveils = repository.recupererReveils(userId)
+            _uiState.value = AccueilUiState(reveils)
 
-                val liste = mutableListOf<ModeleReveil>()
-                val mapMembres = mutableMapOf<String, Set<String>>()
-
-                for (doc in snapshot) {
-                    val membres = doc.get("membres_ids") as? List<String> ?: emptyList()
-                    mapMembres[doc.id] = membres.toSet()
-
-                    liste.add(
-                        ModeleReveil(
-                            id = doc.id, // Mettre ModeleReveil(id: String)
-                            nom = doc.getString("nom") ?: "Sans nom",
-                            heure = doc.getString("heure") ?: "00:00",
-                            dateProchaine = doc.getString("dateProchaine") ?: "À venir",
-                            nbAmis = membres.size,
-                            actifParDefaut = doc.getBoolean("actif") ?: true
-                        )
-                    )
-                }
-                _uiState.value = AccueilUiState(liste)
-                _contactsParReveil.value = mapMembres
-            }
+            // 2. Charger les membres de ces réveils
+            val ids = reveils.map { it.id }
+            _contactsParReveil.value = repository.recupererMembresParReveil(ids)
+        }
     }
 
     fun basculerEtatReveil(idReveil: String, estActif: Boolean) {
-        db.collection("reveils").document(idReveil).update("actif", estActif)
+        viewModelScope.launch {
+            val succes = repository.mettreAJourReveil(idReveil, mapOf("actif" to estActif))
+            if (succes) chargerReveils()
+        }
     }
 
     fun ajouterReveil(nom: String, heure: String) {
-        val uid = auth.currentUser?.uid ?: return
-        val nouveauReveil = hashMapOf(
-            "nom" to nom.trim(),
-            "heure" to heure,
-            "dateProchaine" to "À venir",
-            "createur_id" to uid,
-            "membres_ids" to emptyList<String>(),
-            "actif" to true
-        )
-        db.collection("reveils").add(nouveauReveil)
+        viewModelScope.launch {
+            val userId = Supabase.client.auth.currentUserOrNull()?.id ?: return@launch
+            val succes = repository.ajouterReveil(userId, nom.trim(), heure)
+            if (succes) chargerReveils()
+        }
     }
 
     fun modifierReveil(id: String, nom: String, heure: String) {
-        db.collection("reveils").document(id).update(
-            mapOf(
-                "nom" to nom.trim(),
-                "heure" to heure
+        viewModelScope.launch {
+            val succes = repository.mettreAJourReveil(
+                id,
+                mapOf("nom" to nom.trim(), "heure" to heure)
             )
-        )
+            if (succes) chargerReveils()
+        }
     }
 
     fun supprimerReveil(id: String) {
-        db.collection("reveils").document(id).delete()
+        viewModelScope.launch {
+            val succes = repository.supprimerReveil(id)
+            if (succes) chargerReveils()
+        }
     }
 
-    // Associer un ID Firebase (String) au lieu d'un Int
     fun basculerContact(idReveil: String, idContact: String, associe: Boolean) {
-        val ref = db.collection("reveils").document(idReveil)
-        db.runTransaction { transaction ->
-            val snapshot = transaction.get(ref)
-            val membres = (snapshot.get("membres_ids") as? List<String>)?.toMutableList() ?: mutableListOf()
-
-            if (associe && !membres.contains(idContact)) {
-                membres.add(idContact)
-            } else if (!associe) {
-                membres.remove(idContact)
-            }
-            transaction.update(ref, "membres_ids", membres)
+        viewModelScope.launch {
+            val succes = repository.basculerMembre(idReveil, idContact, associe)
+            if (succes) chargerReveils()
         }
     }
 }

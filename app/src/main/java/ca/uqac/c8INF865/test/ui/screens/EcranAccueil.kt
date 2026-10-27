@@ -1,4 +1,4 @@
-package ca.uqac.c8INF865.test.screens
+package ca.uqac.c8INF865.test.ui.screens
 
 import android.Manifest
 import android.app.AlarmManager
@@ -31,7 +31,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Calendar
@@ -39,6 +38,7 @@ import java.util.Locale
 import ca.uqac.c8INF865.test.AlarmReceiver
 import ca.uqac.c8INF865.test.MainActivity
 import ca.uqac.c8INF865.test.data.Reveil
+import ca.uqac.c8INF865.test.data.Utilisateur
 import ca.uqac.c8INF865.test.viewModel.ContactViewModel
 import ca.uqac.c8INF865.test.viewModel.ReveilViewModel
 
@@ -90,7 +90,7 @@ fun programmerAlarmeReveil(context: Context, reveil: Reveil) {
             alarmPendingIntent(context, reveil.id)
         )
     } catch (e: SecurityException) {
-        // Gérer l'absence de permission SCHEDULE_EXACT_ALARM si nécessaire
+        // Gérer l'absence de permission SCHEDULE_EXACT_ALARM
     }
 }
 
@@ -188,7 +188,7 @@ fun EcranAccueilReveil(
 @Composable
 fun CarteReveil(
     reveil: Reveil,
-    contacts: List<Contact> = emptyList(),
+    contacts: List<Utilisateur> = emptyList(), // Utilisation de Utilisateur
     contactsAssocies: Set<String> = emptySet(),
     onEtatChange: (Boolean) -> Unit = {},
     onModifier: (String, String) -> Unit = { _, _ -> },
@@ -233,6 +233,12 @@ fun CarteReveil(
                     fontSize = 36.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = if (isActif) MaterialTheme.colorScheme.primary else Color.Gray
+                )
+                Text(
+                    text = "À venir", // Adapté puisque dateProchaine a été retiré de Reveil
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(bottom = 6.dp)
                 )
             }
 
@@ -306,7 +312,7 @@ fun CarteReveil(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text("Personnes liées (Amis)", fontWeight = FontWeight.Bold)
 
-                val contactsAssociesDetails = contacts.filter { it.id.toString() in contactsAssocies }
+                val contactsAssociesDetails = contacts.filter { it.id in contactsAssocies }
                 if (contactsAssociesDetails.isEmpty()) {
                     Text("Aucun contact lié.", color = Color.Gray)
                 } else {
@@ -315,8 +321,8 @@ fun CarteReveil(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(contact.name, modifier = Modifier.weight(1f))
-                            TextButton(onClick = { onContactChange(contact.id.toString(), false) }) {
+                            Text(contact.nom, modifier = Modifier.weight(1f)) // Adaptation pour Utilisateur.nom
+                            TextButton(onClick = { onContactChange(contact.id, false) }) {
                                 Text("Retirer")
                             }
                         }
@@ -325,7 +331,7 @@ fun CarteReveil(
                 var afficherAjoutContact by remember { mutableStateOf(false) }
                 OutlinedButton(
                     onClick = { afficherAjoutContact = true },
-                    enabled = contacts.any { it.id.toString() !in contactsAssocies },
+                    enabled = contacts.any { it.id !in contactsAssocies },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null)
@@ -334,7 +340,7 @@ fun CarteReveil(
                 }
                 if (afficherAjoutContact) {
                     SelectionContacts(
-                        contacts = contacts.filter { it.id.toString() !in contactsAssocies },
+                        contacts = contacts.filter { it.id !in contactsAssocies },
                         onDismiss = { afficherAjoutContact = false },
                         onConfirm = { ids ->
                             ids.forEach { onContactChange(it, true) }
@@ -481,7 +487,7 @@ private fun SelecteurHeure(
 
 @Composable
 private fun SelectionContacts(
-    contacts: List<Contact>,
+    contacts: List<Utilisateur>, // Utilisation de Utilisateur
     onDismiss: () -> Unit,
     onConfirm: (Set<String>) -> Unit
 ) {
@@ -501,16 +507,16 @@ private fun SelectionContacts(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Checkbox(
-                                checked = contact.id.toString() in selection,
+                                checked = contact.id in selection,
                                 onCheckedChange = { coche ->
                                     selection = if (coche) {
-                                        selection + contact.id.toString()
+                                        selection + contact.id
                                     } else {
-                                        selection - contact.id.toString()
+                                        selection - contact.id
                                     }
                                 }
                             )
-                            Text(contact.name)
+                            Text(contact.nom) // Adaptation pour Utilisateur.nom
                         }
                     }
                 }
@@ -545,13 +551,5 @@ fun CercleAvatar(texte: String? = null) {
         } else {
             Icon(Icons.Filled.Person, contentDescription = "Ami", tint = Color.White, modifier = Modifier.size(24.dp))
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun PreviewEcranAccueil() {
-    MaterialTheme {
-        EcranAccueilReveil()
     }
 }

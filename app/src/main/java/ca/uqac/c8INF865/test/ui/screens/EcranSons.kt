@@ -1,4 +1,4 @@
-package ca.uqac.c8INF865.test.screens
+package ca.uqac.c8INF865.test.ui.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -21,7 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import ca.uqac.c8INF865.test.viewModel.Son
+import ca.uqac.c8INF865.test.data.Son
 import ca.uqac.c8INF865.test.viewModel.SonViewModel
 import java.io.File
 import java.text.SimpleDateFormat

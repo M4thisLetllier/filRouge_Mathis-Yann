@@ -1,6 +1,5 @@
 package ca.uqac.c8INF865.test
 
-import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Group
@@ -11,25 +10,29 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.currentBackStackEntryAsState
-import ca.uqac.c8INF865.test.screens.EcranAccueilReveil
-import ca.uqac.c8INF865.test.screens.EcranContact
-import ca.uqac.c8INF865.test.screens.EcranSons
-import ca.uqac.c8INF865.test.screens.EcranConnexion
-import com.google.firebase.auth.FirebaseAuth
+import androidx.navigation.compose.rememberNavController
+
+import ca.uqac.c8INF865.test.ui.screens.EcranAccueilReveil
+import ca.uqac.c8INF865.test.ui.screens.EcranContact
+import ca.uqac.c8INF865.test.ui.screens.EcranSons
+import ca.uqac.c8INF865.test.ui.screens.PageConnexion // Nouveau nom de ton écran de connexion
+
+import ca.uqac.c8INF865.test.network.Supabase
+import io.github.jan.supabase.gotrue.auth
 
 @Composable
 fun MonApp() {
     val navController = rememberNavController()
 
-    // 1. Vérifier si un utilisateur est déjà connecté
-    val auth = FirebaseAuth.getInstance()
-    val destinationDepart = if (auth.currentUser != null) "accueil" else "connexion"
+    // 1. Vérifier si un utilisateur est déjà connecté via Supabase
+    val idUtilisateurCourant = Supabase.client.auth.currentUserOrNull()?.id
+    val destinationDepart = if (idUtilisateurCourant != null) "accueil" else "connexion"
 
     val items = listOf(
         BottomBarItem("accueil", "Réveils", Icons.Filled.Notifications),
@@ -75,8 +78,8 @@ fun MonApp() {
         ) {
             // 5. Ajouter la route pour la connexion
             composable("connexion") {
-                EcranConnexion(
-                    onVoirDetail = {
+                PageConnexion(
+                    onConnexionReussie = {
                         navController.navigate("accueil") {
                             popUpTo("connexion") { inclusive = true }
                         }

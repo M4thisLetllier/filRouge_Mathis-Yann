@@ -1,4 +1,4 @@
-package ca.uqac.c8INF865.test.screens
+package ca.uqac.c8INF865.test.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,35 +20,32 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ca.uqac.c8INF865.test.data.Utilisateur
 import ca.uqac.c8INF865.test.viewModel.ContactViewModel
-
-// Structure d'un contact
-data class Contact(
-    val id: Int,
-    val name: String,
-    val phone: String
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EcranContact(
-    contactViewModel: ContactViewModel = viewModel() // Instanciation autonome sans Room
+    contactViewModel: ContactViewModel = viewModel()
 ) {
     val contacts by contactViewModel.contacts.collectAsState()
+    val erreur by contactViewModel.messageErreur.collectAsState()
     val texteRecherche = contactViewModel.recherche.trim()
 
-    // Gérer l'affichage du formulaire d'ajout
     var afficherAjoutContact by remember { mutableStateOf(false) }
 
     val contactsFiltres = contacts.filter { contact ->
-        contact.name.contains(texteRecherche, ignoreCase = true) ||
-                contact.phone.contains(texteRecherche, ignoreCase = true)
+        contact.nom.contains(texteRecherche, ignoreCase = true) ||
+                contact.telephone.contains(texteRecherche, ignoreCase = true)
     }
 
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { afficherAjoutContact = true },
+                onClick = {
+                    contactViewModel.effacerErreur()
+                    afficherAjoutContact = true
+                },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White
             ) {
@@ -100,21 +97,23 @@ fun EcranContact(
         }
     }
 
-    // Affichage du formulaire d'ajout par-dessus l'écran
     if (afficherAjoutContact) {
         FormulaireContact(
+            erreur = erreur,
             onDismiss = { afficherAjoutContact = false },
-            onConfirm = { nom, telephone ->
-                contactViewModel.ajouterContact(nom, telephone)
-                afficherAjoutContact = false
+            onConfirm = { telephone ->
+                contactViewModel.ajouterContact(telephone)
+                // On ne ferme pas automatiquement si erreur
+                if (erreur == null) {
+                    afficherAjoutContact = false
+                }
             }
         )
     }
 }
 
-// Brique d'une personne dans la liste
 @Composable
-fun ContactCard(contact: Contact, onSupprimer: () -> Unit = {}) {
+fun ContactCard(contact: Utilisateur, onSupprimer: () -> Unit = {}) {
     var afficherConfirmation by remember { mutableStateOf(false) }
 
     Card(
@@ -144,19 +143,15 @@ fun ContactCard(contact: Contact, onSupprimer: () -> Unit = {}) {
             Spacer(modifier = Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = contact.name,
-                )
+                Text(text = contact.nom)
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = contact.phone,
-                )
+                Text(text = contact.telephone)
             }
 
             IconButton(onClick = { afficherConfirmation = true }) {
                 Icon(
                     imageVector = Icons.Default.Delete,
-                    contentDescription = "Supprimer ${contact.name}"
+                    contentDescription = "Supprimer ${contact.nom}"
                 )
             }
         }
@@ -165,10 +160,8 @@ fun ContactCard(contact: Contact, onSupprimer: () -> Unit = {}) {
     if (afficherConfirmation) {
         AlertDialog(
             onDismissRequest = { afficherConfirmation = false },
-            title = { Text("Supprimer le contact ?") },
-            text = {
-                Text("Voulez-vous vraiment supprimer ${contact.name} ? Cette action est irréversible.")
-            },
+            title = { Text("Retirer des amis ?") },
+            text = { Text("Voulez-vous vraiment retirer ${contact.nom} de vos amis ?") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -188,44 +181,44 @@ fun ContactCard(contact: Contact, onSupprimer: () -> Unit = {}) {
     }
 }
 
-// Boîte de dialogue pour ajouter un nouveau contact
 @Composable
 private fun FormulaireContact(
+    erreur: String?,
     onDismiss: () -> Unit,
-    onConfirm: (String, String) -> Unit
+    onConfirm: (String) -> Unit
 ) {
-    var nom by remember { mutableStateOf("") }
     var telephone by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Ajouter un contact") },
+        title = { Text("Ajouter un ami") },
         text = {
             Column {
-                OutlinedTextField(
-                    value = nom,
-                    onValueChange = { nom = it },
-                    label = { Text("Nom du contact") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+                Text("Entrez le numéro de téléphone de votre ami pour l'ajouter à vos contacts.")
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (erreur != null) {
+                    Text(text = erreur, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
                 OutlinedTextField(
                     value = telephone,
                     onValueChange = { telephone = it },
                     label = { Text("Numéro de téléphone") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = erreur != null
                 )
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(nom, telephone) },
-                enabled = nom.isNotBlank() && telephone.isNotBlank()
+                onClick = { onConfirm(telephone) },
+                enabled = telephone.isNotBlank()
             ) {
-                Text("Ajouter")
+                Text("Rechercher et Ajouter")
             }
         },
         dismissButton = {
