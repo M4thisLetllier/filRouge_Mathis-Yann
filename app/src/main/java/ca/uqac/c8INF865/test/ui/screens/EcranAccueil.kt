@@ -1,5 +1,13 @@
 package ca.uqac.c8INF865.test.screens
 
+import android.Manifest
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,39 +29,102 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.Calendar
 import java.util.Locale
+import ca.uqac.c8INF865.test.AlarmReceiver
+import ca.uqac.c8INF865.test.MainActivity
+import ca.uqac.c8INF865.test.data.Reveil
 import ca.uqac.c8INF865.test.viewModel.ContactViewModel
 import ca.uqac.c8INF865.test.viewModel.ReveilViewModel
 
-// Définition des données
-data class ModeleReveil(
-    val id: String,
-    val nom: String,
-    val heure: String,
-    val dateProchaine: String,
-    val nbAmis: Int,
-    val actifParDefaut: Boolean
-)
+// --- Fonctions utilitaires pour l'AlarmManager natif ---
 
-// Écran Principal
+private fun calculerProchaineOccurrence(heureStr: String): Long {
+    val parties = heureStr.split(":")
+    val heure = parties.getOrNull(0)?.toIntOrNull() ?: 7
+    val minute = parties.getOrNull(1)?.toIntOrNull() ?: 0
+
+    return Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, heure)
+        set(Calendar.MINUTE, minute)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+        if (timeInMillis <= System.currentTimeMillis()) {
+            add(Calendar.DAY_OF_YEAR, 1)
+        }
+    }.timeInMillis
+}
+
+private fun alarmPendingIntent(context: Context, reveilId: String): PendingIntent {
+    val intent = Intent(context, AlarmReceiver::class.java).apply {
+        putExtra("REVEIL_ID", reveilId)
+    }
+    return PendingIntent.getBroadcast(
+        context,
+        reveilId.hashCode(),
+        intent,
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    )
+}
+
+fun programmerAlarmeReveil(context: Context, reveil: Reveil) {
+    if (!reveil.actif) return
+    val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
+    val triggerAtMillis = calculerProchaineOccurrence(reveil.heure)
+
+    val showIntent = PendingIntent.getActivity(
+        context,
+        reveil.id.hashCode(),
+        Intent(context, MainActivity::class.java),
+        PendingIntent.FLAG_IMMUTABLE
+    )
+
+    try {
+        alarmManager.setAlarmClock(
+            AlarmManager.AlarmClockInfo(triggerAtMillis, showIntent),
+            alarmPendingIntent(context, reveil.id)
+        )
+    } catch (e: SecurityException) {
+        // Gérer l'absence de permission SCHEDULE_EXACT_ALARM si nécessaire
+    }
+}
+
+fun annulerAlarmeReveil(context: Context, reveilId: String) {
+    val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
+    alarmManager.cancel(alarmPendingIntent(context, reveilId))
+}
+
+// --- Écran Principal ---
+
 @Composable
 fun EcranAccueilReveil(
-    reveilViewModel: ReveilViewModel = viewModel(), // Instanciation simplifiée sans Room
+    reveilViewModel: ReveilViewModel = viewModel(),
     contactViewModel: ContactViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val reveils by reveilViewModel.uiState.collectAsState()
     val contactsParReveil by reveilViewModel.contactsParReveil.collectAsState()
     val contacts by contactViewModel.contacts.collectAsState()
     var afficherAjout by remember { mutableStateOf(false) }
 
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { afficherAjout = true },
+                onClick = {
+                    if (Build.VERSION.SDK_INT >= 33) {
+                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                    afficherAjout = true
+                },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White
             ) {
@@ -75,9 +146,24 @@ fun EcranAccueilReveil(
                     reveil = reveil,
                     contacts = contacts,
                     contactsAssocies = contactsParReveil[reveil.id].orEmpty(),
-                    onEtatChange = { reveilViewModel.basculerEtatReveil(reveil.id, it) },
-                    onModifier = { nom, heure -> reveilViewModel.modifierReveil(reveil.id, nom, heure) },
-                    onSupprimer = { reveilViewModel.supprimerReveil(reveil.id) },
+                    onEtatChange = { actif ->
+                        reveilViewModel.basculerEtatReveil(reveil.id, actif)
+                        if (actif) {
+                            programmerAlarmeReveil(context, reveil.copy(actif = true))
+                        } else {
+                            annulerAlarmeReveil(context, reveil.id)
+                        }
+                    },
+                    onModifier = { nom, heure ->
+                        reveilViewModel.modifierReveil(reveil.id, nom, heure)
+                        if (reveil.actif) {
+                            programmerAlarmeReveil(context, reveil.copy(nom = nom, heure = heure))
+                        }
+                    },
+                    onSupprimer = {
+                        annulerAlarmeReveil(context, reveil.id)
+                        reveilViewModel.supprimerReveil(reveil.id)
+                    },
                     onContactChange = { contactId, associe ->
                         reveilViewModel.basculerContact(reveil.id, contactId, associe)
                     }
@@ -97,18 +183,19 @@ fun EcranAccueilReveil(
     }
 }
 
-// Composant graphique pour un réveil
+// --- Composant graphique pour un réveil ---
+
 @Composable
 fun CarteReveil(
-    reveil: ModeleReveil,
+    reveil: Reveil,
     contacts: List<Contact> = emptyList(),
-    contactsAssocies: Set<String> = emptySet(), // Passage en String pour Firestore
+    contactsAssocies: Set<String> = emptySet(),
     onEtatChange: (Boolean) -> Unit = {},
     onModifier: (String, String) -> Unit = { _, _ -> },
     onSupprimer: () -> Unit = {},
-    onContactChange: (String, Boolean) -> Unit = { _, _ -> } // Passage en String
+    onContactChange: (String, Boolean) -> Unit = { _, _ -> }
 ) {
-    val isActif = reveil.actifParDefaut
+    val isActif = reveil.actif
     val nombreAmis = contactsAssocies.size
     var estOuvert by remember { mutableStateOf(false) }
     var afficherSuppression by remember { mutableStateOf(false) }
@@ -146,12 +233,6 @@ fun CarteReveil(
                     fontSize = 36.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = if (isActif) MaterialTheme.colorScheme.primary else Color.Gray
-                )
-                Text(
-                    text = reveil.dateProchaine,
-                    fontSize = 14.sp,
-                    color = Color.Gray,
-                    modifier = Modifier.padding(bottom = 6.dp)
                 )
             }
 
@@ -202,8 +283,7 @@ fun CarteReveil(
                 OutlinedButton(
                     onClick = { afficherSelectionHeure = true },
                     modifier = Modifier.fillMaxWidth()
-                )
-                {
+                ) {
                     Text("Modifier l'heure : $heure")
                 }
                 if (afficherSelectionHeure) {
@@ -224,9 +304,8 @@ fun CarteReveil(
                     Text("Enregistrer les changements")
                 }
                 Spacer(modifier = Modifier.height(12.dp))
-                Text("Personnes liées", fontWeight = FontWeight.Bold)
+                Text("Personnes liées (Amis)", fontWeight = FontWeight.Bold)
 
-                // Adaptation pour comparer le String de Firebase avec l'ID du contact
                 val contactsAssociesDetails = contacts.filter { it.id.toString() in contactsAssocies }
                 if (contactsAssociesDetails.isEmpty()) {
                     Text("Aucun contact lié.", color = Color.Gray)
@@ -287,7 +366,7 @@ fun CarteReveil(
         AlertDialog(
             onDismissRequest = { afficherSuppression = false },
             title = { Text("Supprimer le réveil ?") },
-            text = { Text("Cette action supprimera aussi les personnes liées à ce réveil.") },
+            text = { Text("Cette action supprimera ce réveil et arrêtera l'alarme associée.") },
             confirmButton = {
                 TextButton(onClick = {
                     afficherSuppression = false
@@ -404,9 +483,9 @@ private fun SelecteurHeure(
 private fun SelectionContacts(
     contacts: List<Contact>,
     onDismiss: () -> Unit,
-    onConfirm: (Set<String>) -> Unit // Passage en String
+    onConfirm: (Set<String>) -> Unit
 ) {
-    var selection by remember { mutableStateOf(emptySet<String>()) } // Passage en String
+    var selection by remember { mutableStateOf(emptySet<String>()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
