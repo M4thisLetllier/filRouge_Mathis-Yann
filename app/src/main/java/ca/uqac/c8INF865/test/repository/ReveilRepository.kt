@@ -64,6 +64,7 @@ class ReveilRepository {
         return withContext(Dispatchers.IO) {
             try {
                 val nouveauReveil = Reveil(
+                    id = java.util.UUID.randomUUID().toString(), // Génère un vrai UUID valide
                     createur_id = userId,
                     nom = nom,
                     heure = heure,
@@ -72,6 +73,7 @@ class ReveilRepository {
                 db.from("reveils").insert(nouveauReveil)
                 true
             } catch (e: Exception) {
+                android.util.Log.e("SupabaseReveil", "Erreur lors de l'ajout du réveil", e)
                 false
             }
         }

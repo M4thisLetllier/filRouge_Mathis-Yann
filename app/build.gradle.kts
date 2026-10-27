@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.gms.google.services)
+//    alias(libs.plugins.kotlin.serialization)
     id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21" //
 }
 
@@ -50,6 +51,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
+
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0") // (ou version équivalente)
     /// Supabase
     val supabaseVersion = "2.6.1"
@@ -59,6 +61,8 @@ dependencies {
 
     // Ktor (Requis par Supabase)
     implementation("io.ktor:ktor-client-android:2.3.12")
+
+//    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
