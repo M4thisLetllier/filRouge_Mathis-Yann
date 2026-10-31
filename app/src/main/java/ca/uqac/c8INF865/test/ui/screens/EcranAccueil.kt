@@ -42,11 +42,18 @@ import androidx.compose.ui.unit.sp
 import java.util.Calendar
 import java.util.Locale
 import ca.uqac.c8INF865.test.AlarmReceiver
+import ca.uqac.c8INF865.test.AlarmSoundCache
 import ca.uqac.c8INF865.test.MainActivity
 import ca.uqac.c8INF865.test.data.Reveil
 import ca.uqac.c8INF865.test.data.Utilisateur
 import ca.uqac.c8INF865.test.viewModel.ContactViewModel
 import ca.uqac.c8INF865.test.viewModel.ReveilViewModel
+import ca.uqac.c8INF865.test.network.Supabase
+import ca.uqac.c8INF865.test.repository.ReveilRepository
+import io.github.jan.supabase.gotrue.auth
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 // --- Fonctions utilitaires pour l'AlarmManager natif ---
 
@@ -66,9 +73,10 @@ private fun calculerProchaineOccurrence(heureStr: String): Long {
     }.timeInMillis
 }
 
-private fun alarmPendingIntent(context: Context, reveilId: String): PendingIntent {
+private fun alarmPendingIntent(context: Context, reveilId: String, sonId: String?): PendingIntent {
     val intent = Intent(context, AlarmReceiver::class.java).apply {
         putExtra("REVEIL_ID", reveilId)
+        putExtra("SON_ID", sonId)
     }
     return PendingIntent.getBroadcast(
         context,
@@ -78,31 +86,41 @@ private fun alarmPendingIntent(context: Context, reveilId: String): PendingInten
     )
 }
 
-fun programmerAlarmeReveil(context: Context, reveil: Reveil) {
+fun programmerAlarmeReveil(context: Context, reveil: Reveil, sonId: String? = null, sonUrl: String? = null) {
     if (!reveil.actif) return
     val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
     val triggerAtMillis = calculerProchaineOccurrence(reveil.heure)
 
-    val showIntent = PendingIntent.getActivity(
-        context,
-        reveil.id.hashCode(),
-        Intent(context, MainActivity::class.java),
-        PendingIntent.FLAG_IMMUTABLE
-    )
-
-    try {
-        alarmManager.setAlarmClock(
-            AlarmManager.AlarmClockInfo(triggerAtMillis, showIntent),
-            alarmPendingIntent(context, reveil.id)
+    CoroutineScope(Dispatchers.IO).launch {
+        val userId = Supabase.client.auth.currentUserOrNull()?.id
+        val sonDepuisBdd = userId?.let {
+            ReveilRepository().recupererSonPourReveil(reveil.id, it)
+        }
+        val idDuSon = sonDepuisBdd?.sonId ?: sonId
+        val urlDuSon = sonDepuisBdd?.sonUrl ?: sonUrl
+        if (idDuSon != null && !urlDuSon.isNullOrBlank()) {
+            AlarmSoundCache.cache(context.applicationContext, idDuSon, urlDuSon)
+        }
+        val showIntent = PendingIntent.getActivity(
+            context,
+            reveil.id.hashCode(),
+            Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-    } catch (e: SecurityException) {
-        // Gérer l'absence de permission SCHEDULE_EXACT_ALARM
+        try {
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(triggerAtMillis, showIntent),
+                alarmPendingIntent(context, reveil.id, idDuSon)
+            )
+        } catch (e: SecurityException) {
+            android.util.Log.e("Alarm", "Permission d'alarme exacte absente", e)
+        }
     }
 }
 
 fun annulerAlarmeReveil(context: Context, reveilId: String) {
     val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
-    alarmManager.cancel(alarmPendingIntent(context, reveilId))
+    alarmManager.cancel(alarmPendingIntent(context, reveilId, null))
 }
 
 // --- Écran Principal ---
@@ -116,6 +134,7 @@ fun EcranAccueilReveil(
     val context = LocalContext.current
     val reveils by reveilViewModel.uiState.collectAsState()
     val contactsParReveil by reveilViewModel.contactsParReveil.collectAsState()
+    val currentUserId = Supabase.client.auth.currentUserOrNull()?.id
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -184,7 +203,14 @@ fun EcranAccueilReveil(
                         onEtatChange = { actif ->
                             reveilViewModel.basculerEtatReveil(reveil.id, actif)
                             if (actif) {
-                                programmerAlarmeReveil(context, reveil.copy(actif = true))
+                                val son = contactsParReveil[reveil.id].orEmpty()
+                                    .firstOrNull { it.membreId == currentUserId }
+                                programmerAlarmeReveil(
+                                    context,
+                                    reveil.copy(actif = true),
+                                    son?.sonId,
+                                    son?.sonUrl
+                                )
                             } else {
                                 annulerAlarmeReveil(context, reveil.id)
                             }

@@ -21,6 +21,8 @@ import ca.uqac.c8INF865.test.viewModel.ContactViewModel
 import ca.uqac.c8INF865.test.viewModel.ReveilViewModel
 import ca.uqac.c8INF865.test.viewModel.SonViewModel
 import androidx.compose.ui.platform.LocalContext
+import ca.uqac.c8INF865.test.network.Supabase
+import io.github.jan.supabase.gotrue.auth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,6 +47,7 @@ fun EcranModificationReveil(
     val idsAssocies = contactsAssocies.map { it.membreId }
     val contactsAssociesDonnees = contactsParReveil[reveil.id].orEmpty()
     val contactsAssociesIds = contactsAssociesDonnees.map { it.membreId }.toSet()
+    val currentUserId = Supabase.client.auth.currentUserOrNull()?.id
 
     val context = LocalContext.current
 
@@ -106,7 +109,15 @@ fun EcranModificationReveil(
 
                         //On reprogramme l'alarme du téléphone avec les nouvelles données
                         if (reveil.actif) {
-                            programmerAlarmeReveil(context, reveil.copy(nom = nom, heure = heure))
+                            val son = contactsAssociesDonnees.firstOrNull {
+                                it.membreId == currentUserId
+                            }
+                            programmerAlarmeReveil(
+                                context,
+                                reveil.copy(nom = nom, heure = heure),
+                                son?.sonId,
+                                son?.sonUrl
+                            )
                         }
                     }
                     onRetour()

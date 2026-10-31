@@ -1,6 +1,7 @@
 package ca.uqac.c8INF865.test.repository
 
 import ca.uqac.c8INF865.test.data.Reveil
+import ca.uqac.c8INF865.test.data.Son
 import ca.uqac.c8INF865.test.network.Supabase
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +23,7 @@ private data class ReveilMembreRelation(
 @Serializable
 private data class MembreSonUpdate(val son_id: String)
 
-data class MembreReveilInfo(val membreId: String, val sonId: String?)
+data class MembreReveilInfo(val membreId: String, val sonId: String?, val sonUrl: String? = null)
 
 class ReveilRepository {
     private val db = Supabase.client.postgrest
@@ -64,14 +65,51 @@ class ReveilRepository {
                 val relations = db.from("reveil_membres")
                     .select { filter { isIn("reveil_id", reveilIds) } }
                     .decodeList<ReveilMembreRelation>()
+                val sons = relations.mapNotNull { it.son_id }.distinct().let { sonIds ->
+                    if (sonIds.isEmpty()) {
+                        emptyList()
+                    } else {
+                        db.from("sons").select { filter { isIn("id", sonIds) } }.decodeList<Son>()
+                    }
+                }.associateBy { it.id }
 
                 // On groupe par réveil, mais on garde l'ID du membre ET l'ID du son
                 relations.groupBy(
                     keySelector = { it.reveil_id },
-                    valueTransform = { MembreReveilInfo(it.membre_id, it.son_id) }
+                    valueTransform = {
+                        MembreReveilInfo(it.membre_id, it.son_id, sons[it.son_id]?.url)
+                    }
                 )
             } catch (e: Exception) {
                 emptyMap()
+            }
+        }
+
+    }
+
+    suspend fun recupererSonPourReveil(reveilId: String, membreId: String): MembreReveilInfo? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val relation = db.from("reveil_membres")
+                    .select {
+                        filter {
+                            eq("reveil_id", reveilId)
+                            eq("membre_id", membreId)
+                        }
+                    }
+                    .decodeList<ReveilMembreRelation>()
+                    .firstOrNull()
+                    ?: return@withContext null
+
+                val son = relation.son_id?.let { sonId ->
+                    db.from("sons").select { filter { eq("id", sonId) } }
+                        .decodeList<Son>()
+                        .firstOrNull()
+                }
+                MembreReveilInfo(relation.membre_id, relation.son_id, son?.url)
+            } catch (exception: Exception) {
+                android.util.Log.e("SupabaseReveil", "Erreur récupération son du réveil", exception)
+                null
             }
         }
     }
