@@ -2,15 +2,21 @@ package ca.uqac.c8INF865.test
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
@@ -21,14 +27,18 @@ import androidx.navigation.compose.rememberNavController
 import ca.uqac.c8INF865.test.ui.screens.EcranAccueilReveil
 import ca.uqac.c8INF865.test.ui.screens.EcranContact
 import ca.uqac.c8INF865.test.ui.screens.EcranSons
+import ca.uqac.c8INF865.test.ui.screens.EcranProfil
 import ca.uqac.c8INF865.test.ui.screens.PageConnexion // Nouveau nom de ton écran de connexion
+import ca.uqac.c8INF865.test.viewModel.AuthViewModel
 
 import ca.uqac.c8INF865.test.network.Supabase
 import io.github.jan.supabase.gotrue.auth
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun MonApp() {
     val navController = rememberNavController()
+    val authViewModel: AuthViewModel = viewModel()
 
     // 1. Vérifier si un utilisateur est déjà connecté via Supabase
     val idUtilisateurCourant = Supabase.client.auth.currentUserOrNull()?.id
@@ -45,6 +55,29 @@ fun MonApp() {
     val afficherBarreNavigation = currentDestination?.route != "connexion"
 
     Scaffold(
+        topBar = {
+            if (afficherBarreNavigation) {
+                TopAppBar(
+                    title = {
+                        Text(if (currentDestination?.route == "profil") "Profil" else "Mon réveil")
+                    },
+                    navigationIcon = {
+                        if (currentDestination?.route == "profil") {
+                            IconButton(onClick = { navController.popBackStack() }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                            }
+                        }
+                    },
+                    actions = {
+                        if (currentDestination?.route != "profil") {
+                            IconButton(onClick = { navController.navigate("profil") }) {
+                                Icon(Icons.Filled.AccountCircle, contentDescription = "Mon profil")
+                            }
+                        }
+                    }
+                )
+            }
+        },
         bottomBar = {
             // 3. Condition pour afficher ou non la barre
             if (afficherBarreNavigation) {
@@ -79,6 +112,7 @@ fun MonApp() {
             // 5. Ajouter la route pour la connexion
             composable("connexion") {
                 PageConnexion(
+                    authViewModel = authViewModel,
                     onConnexionReussie = {
                         navController.navigate("accueil") {
                             popUpTo("connexion") { inclusive = true }
@@ -94,6 +128,16 @@ fun MonApp() {
             }
             composable("sons") {
                 EcranSons()
+            }
+            composable("profil") {
+                EcranProfil(
+                    authViewModel = authViewModel,
+                    onDeconnexion = {
+                        navController.navigate("connexion") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                )
             }
         }
     }

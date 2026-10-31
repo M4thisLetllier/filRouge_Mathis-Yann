@@ -64,6 +64,47 @@ class AuthRepository {
         }
     }
 
+    suspend fun recupererProfil(): Utilisateur? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val utilisateurId = recupererIdUtilisateurCourant() ?: return@withContext null
+                db.from("utilisateurs")
+                    .select {
+                        filter {
+                            eq("id", utilisateurId)
+                        }
+                    }
+                    .decodeSingleOrNull<Utilisateur>()
+            } catch (e: Exception) {
+                android.util.Log.e("SupabaseAuth", "Erreur de récupération du profil", e)
+                null
+            }
+        }
+    }
+
+    suspend fun mettreAJourProfil(nom: String, telephone: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val utilisateurId = recupererIdUtilisateurCourant() ?: return@withContext false
+                db.from("utilisateurs").update(
+                    Utilisateur(
+                        id = utilisateurId,
+                        nom = nom,
+                        telephone = telephone
+                    )
+                ) {
+                    filter {
+                        eq("id", utilisateurId)
+                    }
+                }
+                true
+            } catch (e: Exception) {
+                android.util.Log.e("SupabaseAuth", "Erreur de mise à jour du profil", e)
+                false
+            }
+        }
+    }
+
     fun recupererIdUtilisateurCourant(): String? {
         return auth.currentUserOrNull()?.id
     }
