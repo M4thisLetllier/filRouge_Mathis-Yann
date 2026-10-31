@@ -28,7 +28,7 @@ class ReveilViewModel : ViewModel() {
         chargerReveils()
     }
 
-    private fun chargerReveils() {
+    fun chargerReveils() {
         viewModelScope.launch {
             val userId = Supabase.client.auth.currentUserOrNull()?.id ?: return@launch
 

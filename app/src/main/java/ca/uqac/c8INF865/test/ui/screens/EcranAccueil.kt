@@ -19,8 +19,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,6 +29,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Calendar
@@ -100,21 +106,41 @@ fun annulerAlarmeReveil(context: Context, reveilId: String) {
 }
 
 // --- Écran Principal ---
-
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun EcranAccueilReveil(
+    onModifierReveil: (Reveil) -> Unit,
     reveilViewModel: ReveilViewModel = viewModel(),
     contactViewModel: ContactViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val reveils by reveilViewModel.uiState.collectAsState()
     val contactsParReveil by reveilViewModel.contactsParReveil.collectAsState()
-    val contacts by contactViewModel.contacts.collectAsState()
-    var afficherAjout by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
+
+    // --- MISE À JOUR AUTOMATIQUE AU RETOUR SUR LA PAGE ---
+    LaunchedEffect(Unit) {
+        reveilViewModel.chargerReveils()
+    }
+
+    // --- GESTION DU PULL-TO-REFRESH (Version Material 2) ---
+    val coroutineScope = rememberCoroutineScope()
+    var isRefreshing by remember { mutableStateOf(false) }
+
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = {
+            coroutineScope.launch {
+                isRefreshing = true
+                reveilViewModel.chargerReveils()
+                delay(800) // Petit délai pour laisser l'animation visible
+                isRefreshing = false
+            }
+        }
+    )
 
     Scaffold(
         floatingActionButton = {
@@ -123,7 +149,9 @@ fun EcranAccueilReveil(
                     if (Build.VERSION.SDK_INT >= 33) {
                         permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
-                    afficherAjout = true
+                    onModifierReveil(
+                        Reveil(id = "", createur_id = "", nom = "", heure = "07:30", actif = true)
+                    )
                 },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White
@@ -132,76 +160,59 @@ fun EcranAccueilReveil(
             }
         }
     ) { paddingValues ->
-        LazyColumn(
+        // Application du pullRefresh sur la Box contenant la liste
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(vertical = 24.dp)
+                .pullRefresh(pullRefreshState)
         ) {
-            items(reveils.listeReveils) { reveil ->
-                CarteReveil(
-                    reveil = reveil,
-                    contacts = contacts,
-                    contactsAssocies = contactsParReveil[reveil.id].orEmpty(),
-                    onEtatChange = { actif ->
-                        reveilViewModel.basculerEtatReveil(reveil.id, actif)
-                        if (actif) {
-                            programmerAlarmeReveil(context, reveil.copy(actif = true))
-                        } else {
-                            annulerAlarmeReveil(context, reveil.id)
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(vertical = 24.dp)
+            ) {
+                items(reveils.listeReveils) { reveil ->
+                    CarteReveil(
+                        reveil = reveil,
+                        contactsAssocies = contactsParReveil[reveil.id].orEmpty(),
+                        onClick = { onModifierReveil(reveil) },
+                        onEtatChange = { actif ->
+                            reveilViewModel.basculerEtatReveil(reveil.id, actif)
+                            if (actif) {
+                                programmerAlarmeReveil(context, reveil.copy(actif = true))
+                            } else {
+                                annulerAlarmeReveil(context, reveil.id)
+                            }
                         }
-                    },
-                    onModifier = { nom, heure ->
-                        reveilViewModel.modifierReveil(reveil.id, nom, heure)
-                        if (reveil.actif) {
-                            programmerAlarmeReveil(context, reveil.copy(nom = nom, heure = heure))
-                        }
-                    },
-                    onSupprimer = {
-                        annulerAlarmeReveil(context, reveil.id)
-                        reveilViewModel.supprimerReveil(reveil.id)
-                    },
-                    onContactChange = { contactId, associe ->
-                        reveilViewModel.basculerContact(reveil.id, contactId, associe)
-                    }
-                )
+                    )
+                }
             }
-        }
-    }
 
-    if (afficherAjout) {
-        FormulaireReveil(
-            onDismiss = { afficherAjout = false },
-            onConfirm = { nom, heure ->
-                reveilViewModel.ajouterReveil(nom, heure)
-                afficherAjout = false
-            }
-        )
+            // L'indicateur visuel de chargement
+            PullRefreshIndicator(
+                refreshing = isRefreshing,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                contentColor = MaterialTheme.colorScheme.primary
+            )
+        }
     }
 }
 
 // --- Composant graphique pour un réveil ---
-
 @Composable
 fun CarteReveil(
     reveil: Reveil,
-    contacts: List<Utilisateur> = emptyList(), // Utilisation de Utilisateur
     contactsAssocies: Set<String> = emptySet(),
-    onEtatChange: (Boolean) -> Unit = {},
-    onModifier: (String, String) -> Unit = { _, _ -> },
-    onSupprimer: () -> Unit = {},
-    onContactChange: (String, Boolean) -> Unit = { _, _ -> }
+    onClick: () -> Unit,
+    onEtatChange: (Boolean) -> Unit = {}
 ) {
     val isActif = reveil.actif
     val nombreAmis = contactsAssocies.size
-    var estOuvert by remember { mutableStateOf(false) }
-    var afficherSuppression by remember { mutableStateOf(false) }
-    var nom by remember(reveil.nom) { mutableStateOf(reveil.nom) }
-    var heure by remember(reveil.heure) { mutableStateOf(reveil.heure) }
-
     val couleurFond = if (isActif) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant
 
     Card(
@@ -211,7 +222,7 @@ fun CarteReveil(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { estOuvert = !estOuvert }
+            .clickable(onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
@@ -220,9 +231,7 @@ fun CarteReveil(
                 fontWeight = FontWeight.Bold,
                 color = if (isActif) MaterialTheme.colorScheme.onSurface else Color.Gray
             )
-
             Spacer(modifier = Modifier.height(8.dp))
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -235,15 +244,13 @@ fun CarteReveil(
                     color = if (isActif) MaterialTheme.colorScheme.primary else Color.Gray
                 )
                 Text(
-                    text = "À venir", // Adapté puisque dateProchaine a été retiré de Reveil
+                    text = "À venir",
                     fontSize = 14.sp,
                     color = Color.Gray,
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
             }
-
             Spacer(modifier = Modifier.height(16.dp))
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -257,7 +264,6 @@ fun CarteReveil(
                     } else {
                         val maxAffiches = 3
                         val nbAffiches = if (nombreAmis > maxAffiches) maxAffiches else nombreAmis
-
                         for (i in 0 until nbAffiches) {
                             CercleAvatar()
                         }
@@ -266,186 +272,19 @@ fun CarteReveil(
                         }
                     }
                 }
-
                 Switch(
                     checked = isActif,
                     onCheckedChange = onEtatChange
                 )
             }
-
-            if (estOuvert) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-                Text("Détails du réveil", fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = nom,
-                    onValueChange = { nom = it },
-                    label = { Text("Nom") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                var afficherSelectionHeure by remember { mutableStateOf(false) }
-                OutlinedButton(
-                    onClick = { afficherSelectionHeure = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Modifier l'heure : $heure")
-                }
-                if (afficherSelectionHeure) {
-                    SelecteurHeure(
-                        heureInitiale = heure,
-                        onDismiss = { afficherSelectionHeure = false },
-                        onConfirm = {
-                            heure = it
-                            afficherSelectionHeure = false
-                        }
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = { onModifier(nom, heure) },
-                    enabled = nom.isNotBlank()
-                ) {
-                    Text("Enregistrer les changements")
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                Text("Personnes liées (Amis)", fontWeight = FontWeight.Bold)
-
-                val contactsAssociesDetails = contacts.filter { it.id in contactsAssocies }
-                if (contactsAssociesDetails.isEmpty()) {
-                    Text("Aucun contact lié.", color = Color.Gray)
-                } else {
-                    contactsAssociesDetails.forEach { contact ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(contact.nom, modifier = Modifier.weight(1f)) // Adaptation pour Utilisateur.nom
-                            TextButton(onClick = { onContactChange(contact.id, false) }) {
-                                Text("Retirer")
-                            }
-                        }
-                    }
-                }
-                var afficherAjoutContact by remember { mutableStateOf(false) }
-                OutlinedButton(
-                    onClick = { afficherAjoutContact = true },
-                    enabled = contacts.any { it.id !in contactsAssocies },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Ajouter un contact")
-                }
-                if (afficherAjoutContact) {
-                    SelectionContacts(
-                        contacts = contacts.filter { it.id !in contactsAssocies },
-                        onDismiss = { afficherAjoutContact = false },
-                        onConfirm = { ids ->
-                            ids.forEach { onContactChange(it, true) }
-                            afficherAjoutContact = false
-                        }
-                    )
-                }
-                TextButton(
-                    onClick = { afficherSuppression = true },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Icon(Icons.Default.Delete, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Supprimer ce réveil")
-                }
-            } else {
-                Icon(
-                    imageVector = Icons.Default.ExpandMore,
-                    contentDescription = "Afficher les détails",
-                    modifier = Modifier.align(Alignment.End)
-                )
-            }
         }
-    }
-
-    if (afficherSuppression) {
-        AlertDialog(
-            onDismissRequest = { afficherSuppression = false },
-            title = { Text("Supprimer le réveil ?") },
-            text = { Text("Cette action supprimera ce réveil et arrêtera l'alarme associée.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    afficherSuppression = false
-                    onSupprimer()
-                }) {
-                    Text("Supprimer", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { afficherSuppression = false }) {
-                    Text("Annuler")
-                }
-            }
-        )
     }
 }
 
-@Composable
-private fun FormulaireReveil(
-    onDismiss: () -> Unit,
-    onConfirm: (String, String) -> Unit
-) {
-    var nom by remember { mutableStateOf("") }
-    var heure by remember { mutableStateOf("07:30") }
-    var afficherSelectionHeure by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Ajouter un réveil") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = nom,
-                    onValueChange = { nom = it },
-                    label = { Text("Nom du réveil") },
-                    singleLine = true
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { afficherSelectionHeure = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Choisir l'heure : $heure")
-                }
-                if (afficherSelectionHeure) {
-                    SelecteurHeure(
-                        heureInitiale = heure,
-                        onDismiss = { afficherSelectionHeure = false },
-                        onConfirm = {
-                            heure = it
-                            afficherSelectionHeure = false
-                        }
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(nom, heure) },
-                enabled = nom.isNotBlank()
-            ) {
-                Text("Ajouter")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Annuler") }
-        }
-    )
-}
-
+// Composants publics utilisés par les autres écrans
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SelecteurHeure(
+fun SelecteurHeure(
     heureInitiale: String,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
@@ -486,8 +325,8 @@ private fun SelecteurHeure(
 }
 
 @Composable
-private fun SelectionContacts(
-    contacts: List<Utilisateur>, // Utilisation de Utilisateur
+fun SelectionContacts(
+    contacts: List<Utilisateur>,
     onDismiss: () -> Unit,
     onConfirm: (Set<String>) -> Unit
 ) {
@@ -516,7 +355,7 @@ private fun SelectionContacts(
                                     }
                                 }
                             )
-                            Text(contact.nom) // Adaptation pour Utilisateur.nom
+                            Text(contact.nom)
                         }
                     }
                 }
