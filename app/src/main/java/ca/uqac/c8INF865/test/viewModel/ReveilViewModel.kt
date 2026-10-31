@@ -42,13 +42,6 @@ class ReveilViewModel : ViewModel() {
         }
     }
 
-    fun basculerEtatReveil(idReveil: String, estActif: Boolean) {
-        viewModelScope.launch {
-            val succes = repository.mettreAJourReveil(idReveil, mapOf("actif" to estActif))
-            if (succes) chargerReveils()
-        }
-    }
-
     fun ajouterReveil(nom: String, heure: String) {
         viewModelScope.launch {
             val userId = Supabase.client.auth.currentUserOrNull()?.id ?: return@launch
@@ -57,12 +50,18 @@ class ReveilViewModel : ViewModel() {
         }
     }
 
+    fun basculerEtatReveil(idReveil: String, estActif: Boolean) {
+        viewModelScope.launch {
+            // Utilise la nouvelle fonction spécifique à l'état
+            val succes = repository.mettreAJourEtatReveil(idReveil, estActif)
+            if (succes) chargerReveils()
+        }
+    }
+
     fun modifierReveil(id: String, nom: String, heure: String) {
         viewModelScope.launch {
-            val succes = repository.mettreAJourReveil(
-                id,
-                mapOf("nom" to nom.trim(), "heure" to heure)
-            )
+            // Utilise la nouvelle fonction spécifique aux informations
+            val succes = repository.mettreAJourInfosReveil(id, nom.trim(), heure)
             if (succes) chargerReveils()
         }
     }

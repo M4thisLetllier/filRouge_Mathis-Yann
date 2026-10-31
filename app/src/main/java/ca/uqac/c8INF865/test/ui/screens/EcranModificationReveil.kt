@@ -15,9 +15,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ca.uqac.c8INF865.test.data.Reveil
+import ca.uqac.c8INF865.test.data.Son
 import ca.uqac.c8INF865.test.data.Utilisateur
 import ca.uqac.c8INF865.test.viewModel.ContactViewModel
 import ca.uqac.c8INF865.test.viewModel.ReveilViewModel
+import ca.uqac.c8INF865.test.viewModel.SonViewModel
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,15 +28,21 @@ fun EcranModificationReveil(
     reveil: Reveil,
     onRetour: () -> Unit,
     reveilViewModel: ReveilViewModel = viewModel(),
-    contactViewModel: ContactViewModel = viewModel()
+    contactViewModel: ContactViewModel = viewModel(),
+    sonViewModel: SonViewModel = viewModel() // Ajout du ViewModel des sons
 ) {
     val contactsParReveil by reveilViewModel.contactsParReveil.collectAsState()
     val contacts by contactViewModel.contacts.collectAsState()
+
+    // Récupération de la liste des sons de l'utilisateur
+    val sons by sonViewModel.sons.collectAsState()
 
     val estNouveau = reveil.id.isEmpty()
     var nom by remember(reveil.nom) { mutableStateOf(reveil.nom) }
     var heure by remember(reveil.heure) { mutableStateOf(reveil.heure) }
     val contactsAssocies = contactsParReveil[reveil.id].orEmpty()
+
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -90,6 +99,11 @@ fun EcranModificationReveil(
                         reveilViewModel.ajouterReveil(nom, heure)
                     } else {
                         reveilViewModel.modifierReveil(reveil.id, nom, heure)
+
+                        //On reprogramme l'alarme du téléphone avec les nouvelles données
+                        if (reveil.actif) {
+                            programmerAlarmeReveil(context, reveil.copy(nom = nom, heure = heure))
+                        }
                     }
                     onRetour()
                 },
@@ -116,12 +130,51 @@ fun EcranModificationReveil(
                 } else {
                     contactsAssociesDetails.forEach { contact ->
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(contact.nom, modifier = Modifier.weight(1f))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(contact.nom, fontWeight = FontWeight.SemiBold)
+
+                                // Menu déroulant pour la sélection du son
+                                var menuDeroulantOuvert by remember { mutableStateOf(false) }
+                                var sonSelectionne by remember { mutableStateOf<Son?>(null) } // Vous devrez lier ceci au ViewModel
+
+                                Box {
+                                    TextButton(
+                                        onClick = { menuDeroulantOuvert = true },
+                                        contentPadding = PaddingValues(0.dp)
+                                    ) {
+                                        Text(
+                                            text = sonSelectionne?.nom ?: "Attribuer un son...",
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                    DropdownMenu(
+                                        expanded = menuDeroulantOuvert,
+                                        onDismissRequest = { menuDeroulantOuvert = false }
+                                    ) {
+                                        if (sons.isEmpty()) {
+                                            DropdownMenuItem(
+                                                text = { Text("Aucun son disponible") },
+                                                onClick = { menuDeroulantOuvert = false }
+                                            )
+                                        }
+                                        sons.forEach { son ->
+                                            DropdownMenuItem(
+                                                text = { Text(son.nom) },
+                                                onClick = {
+                                                    sonSelectionne = son
+                                                    menuDeroulantOuvert = false
+                                                    // TODO : Appeler une fonction dans ReveilViewModel pour sauvegarder "son.id" dans "reveil_membres"
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                             TextButton(onClick = { reveilViewModel.basculerContact(reveil.id, contact.id, false) }) {
-                                Text("Retirer")
+                                Text("Retirer", color = MaterialTheme.colorScheme.error)
                             }
                         }
                     }

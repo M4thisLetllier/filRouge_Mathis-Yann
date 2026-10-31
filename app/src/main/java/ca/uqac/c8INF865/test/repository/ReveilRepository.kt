@@ -8,7 +8,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
 @Serializable
-private data class ReveilMembreRelation(val reveil_id: String, val membre_id: String)
+private data class ReveilInfosUpdate(val nom: String, val heure: String)
+
+@Serializable
+private data class ReveilActifUpdate(val actif: Boolean)
+
+@Serializable
+    private data class ReveilMembreRelation(val reveil_id: String, val membre_id: String)
 
 class ReveilRepository {
     private val db = Supabase.client.postgrest
@@ -35,7 +41,7 @@ class ReveilRepository {
                 } else emptyList()
 
                 // Retourner la combinaison des deux (sans doublons)
-                (mesReveils + reveilsInvites).distinctBy { it.id }
+                (mesReveils + reveilsInvites).distinctBy { it.id }.sortedBy { it.heure }
             } catch (e: Exception) {
                 android.util.Log.e("SupabaseReveil", "Erreur récupération réveils", e)
                 emptyList()
@@ -79,15 +85,29 @@ class ReveilRepository {
         }
     }
 
-    suspend fun mettreAJourReveil(id: String, mapUpdate: Map<String, Any>): Boolean {
+    suspend fun mettreAJourInfosReveil(id: String, nom: String, heure: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                // mapUpdate peut contenir {"nom": "Test", "heure": "08:00"} ou {"actif": false}
-                db.from("reveils").update(mapUpdate) {
+                db.from("reveils").update(ReveilInfosUpdate(nom, heure)) {
                     filter { eq("id", id) }
                 }
                 true
             } catch (e: Exception) {
+                android.util.Log.e("SupabaseReveil", "Erreur update infos", e)
+                false
+            }
+        }
+    }
+
+    suspend fun mettreAJourEtatReveil(id: String, actif: Boolean): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                db.from("reveils").update(ReveilActifUpdate(actif)) {
+                    filter { eq("id", id) }
+                }
+                true
+            } catch (e: Exception) {
+                android.util.Log.e("SupabaseReveil", "Erreur update etat", e)
                 false
             }
         }
