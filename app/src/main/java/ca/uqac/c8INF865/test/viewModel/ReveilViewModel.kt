@@ -3,27 +3,36 @@ package ca.uqac.c8INF865.test.viewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ca.uqac.c8INF865.test.data.Reveil
+import ca.uqac.c8INF865.test.data.Son
+import ca.uqac.c8INF865.test.data.Utilisateur
 import ca.uqac.c8INF865.test.network.Supabase
+import ca.uqac.c8INF865.test.repository.MembreReveilInfo
 import ca.uqac.c8INF865.test.repository.ReveilRepository
 import io.github.jan.supabase.gotrue.auth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import ca.uqac.c8INF865.test.repository.MembreReveilInfo
 
 data class AccueilUiState(
-    val listeReveils: List<Reveil> = emptyList()
+    val listeReveils: List< Reveil > = emptyList()
 )
 
 class ReveilViewModel : ViewModel() {
     private val repository = ReveilRepository()
 
     private val _uiState = MutableStateFlow(AccueilUiState())
-    val uiState: StateFlow<AccueilUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow< AccueilUiState > = _uiState.asStateFlow()
 
-    private val _contactsParReveil = MutableStateFlow<Map<String, List<MembreReveilInfo>>>(emptyMap())
-    val contactsParReveil: StateFlow<Map<String,List<MembreReveilInfo>>> = _contactsParReveil.asStateFlow()
+    private val _contactsParReveil = MutableStateFlow< Map< String, List< MembreReveilInfo > > >(emptyMap())
+    val contactsParReveil: StateFlow< Map< String, List< MembreReveilInfo > > > = _contactsParReveil.asStateFlow()
+
+    // NOUVEAU : Stocke les sons assignés et les utilisateurs liés (créateurs, amis, auteurs de sons)
+    private val _sonsAssignes = MutableStateFlow< Map< String, Son > >(emptyMap())
+    val sonsAssignes: StateFlow< Map< String, Son > > = _sonsAssignes.asStateFlow()
+
+    private val _utilisateursConnus = MutableStateFlow< Map< String, Utilisateur > >(emptyMap())
+    val utilisateursConnus: StateFlow< Map< String, Utilisateur > > = _utilisateursConnus.asStateFlow()
 
     init {
         chargerReveils()
@@ -39,7 +48,24 @@ class ReveilViewModel : ViewModel() {
 
             // 2. Charger les membres de ces réveils
             val ids = reveils.map { it.id }
-            _contactsParReveil.value = repository.recupererMembresParReveil(ids)
+            val membresMap = repository.recupererMembresParReveil(ids)
+            _contactsParReveil.value = membresMap
+
+            // 3. Récupérer tous les sons assignés (aux membres ET aux créateurs)
+            val sonIdsMembres = membresMap.values.flatten().mapNotNull { it.sonId }
+            val sonIdsCreateurs = reveils.mapNotNull { it.son_id }
+            val tousLesSonIds = (sonIdsMembres + sonIdsCreateurs).distinct()
+            val sonsMap = repository.recupererSonsParIds(tousLesSonIds)
+            _sonsAssignes.value = sonsMap
+
+            // 4. Récupérer les profils de tous les utilisateurs impliqués (pour afficher les pseudos)
+            val userIds = mutableSetOf< String >()
+            userIds.add(userId)
+            reveils.forEach { userIds.add(it.createur_id) }
+            membresMap.values.flatten().forEach { userIds.add(it.membreId) }
+            sonsMap.values.forEach { userIds.add(it.utilisateur_id) }
+
+            _utilisateursConnus.value = repository.recupererUtilisateursParIds(userIds.toList())
         }
     }
 
@@ -53,7 +79,6 @@ class ReveilViewModel : ViewModel() {
 
     fun basculerEtatReveil(idReveil: String, estActif: Boolean) {
         viewModelScope.launch {
-            // Utilise la nouvelle fonction spécifique à l'état
             val succes = repository.mettreAJourEtatReveil(idReveil, estActif)
             if (succes) chargerReveils()
         }
@@ -61,7 +86,6 @@ class ReveilViewModel : ViewModel() {
 
     fun modifierReveil(id: String, nom: String, heure: String) {
         viewModelScope.launch {
-            // Utilise la nouvelle fonction spécifique aux informations
             val succes = repository.mettreAJourInfosReveil(id, nom.trim(), heure)
             if (succes) chargerReveils()
         }
@@ -84,9 +108,15 @@ class ReveilViewModel : ViewModel() {
     fun assignerSonContact(idReveil: String, idContact: String, idSon: String) {
         viewModelScope.launch {
             val succes = repository.assignerSonMembre(idReveil, idContact, idSon)
-            if (succes) {
-                chargerReveils() // Rafraîchit les données après l'ajout
-            }
+            if (succes) chargerReveils()
+        }
+    }
+
+    //Assigner un son au créateur du réveil
+    fun assignerSonCreateur(idReveil: String, idSon: String) {
+        viewModelScope.launch {
+            val succes = repository.assignerSonCreateur(idReveil, idSon)
+            if (succes) chargerReveils()
         }
     }
 }
