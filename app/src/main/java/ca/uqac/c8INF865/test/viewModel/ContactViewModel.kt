@@ -23,17 +23,22 @@ class ContactViewModel : ViewModel() {
     private val _contacts = MutableStateFlow<List<Utilisateur>>(emptyList())
     val contacts: StateFlow<List<Utilisateur>> = _contacts.asStateFlow()
 
+    // NOUVEAU : État pour les demandes
+    private val _demandes = MutableStateFlow<List<Utilisateur>>(emptyList())
+    val demandes: StateFlow<List<Utilisateur>> = _demandes.asStateFlow()
+
     private val _messageErreur = MutableStateFlow<String?>(null)
     val messageErreur: StateFlow<String?> = _messageErreur.asStateFlow()
 
     init {
-        chargerContacts()
+        chargerDonnees()
     }
 
-    private fun chargerContacts() {
+    private fun chargerDonnees() {
         viewModelScope.launch {
             val userId = Supabase.client.auth.currentUserOrNull()?.id ?: return@launch
             _contacts.value = repository.recupererContacts(userId)
+            _demandes.value = repository.recupererDemandes(userId)
         }
     }
 
@@ -44,14 +49,30 @@ class ContactViewModel : ViewModel() {
     fun ajouterContact(telephone: String) {
         viewModelScope.launch {
             val userId = Supabase.client.auth.currentUserOrNull()?.id ?: return@launch
-            val succes = repository.ajouterAmiParTelephone(userId, telephone)
+            // Appelle la nouvelle méthode qui envoie une demande
+            val succes = repository.envoyerDemandeParTelephone(userId, telephone)
 
             if (succes) {
-                chargerContacts()
                 _messageErreur.value = null
             } else {
-                _messageErreur.value = "Aucun utilisateur trouvé avec ce numéro."
+                _messageErreur.value = "Aucun utilisateur trouvé ou demande déjà envoyée."
             }
+        }
+    }
+
+    fun accepterDemande(expediteur: Utilisateur) {
+        viewModelScope.launch {
+            val userId = Supabase.client.auth.currentUserOrNull()?.id ?: return@launch
+            repository.accepterDemande(userId, expediteur.id)
+            chargerDonnees() // Rafraîchit les amis et les demandes
+        }
+    }
+
+    fun refuserDemande(expediteur: Utilisateur) {
+        viewModelScope.launch {
+            val userId = Supabase.client.auth.currentUserOrNull()?.id ?: return@launch
+            repository.refuserDemande(userId, expediteur.id)
+            chargerDonnees() // Rafraîchit les demandes
         }
     }
 
@@ -59,7 +80,7 @@ class ContactViewModel : ViewModel() {
         viewModelScope.launch {
             val userId = Supabase.client.auth.currentUserOrNull()?.id ?: return@launch
             repository.supprimerAmi(userId, contact.id)
-            chargerContacts()
+            chargerDonnees()
         }
     }
 

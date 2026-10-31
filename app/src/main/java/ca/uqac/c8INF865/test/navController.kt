@@ -19,6 +19,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -66,7 +67,7 @@ fun MonApp() {
             if (afficherBarreNavigation) {
                 TopAppBar(
                     title = {
-                        Text(if (currentDestination?.route == "profil") "Profil" else "Mon réveil")
+                        Text(if (currentDestination?.route == "profil") "Profil" else "")
                     },
                     navigationIcon = {
                         if (currentDestination?.route == "profil") {
@@ -114,7 +115,10 @@ fun MonApp() {
         NavHost(
             navController = navController,
             startDestination = destinationDepart,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(
+                top = 64.dp, // Adjust this value to your liking
+                bottom = innerPadding.calculateBottomPadding()
+            )
         ) {
             // 5. Ajouter la route pour la connexion
             composable("connexion") {
