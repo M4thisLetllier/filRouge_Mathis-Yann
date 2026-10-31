@@ -132,45 +132,47 @@ fun MonApp() {
                 )
             }
 
-            // Écran d'accueil mis à jour pour intercepter le clic sur un réveil
             composable("accueil") {
                 EcranAccueilReveil(
                     onModifierReveil = { reveil ->
-                        // On encode le nom avec Uri.encode pour supporter les espaces et caractères spéciaux
                         val nomEncode = Uri.encode(reveil.nom)
-                        navController.navigate("modifier_reveil?id=${reveil.id}&nom=$nomEncode&heure=${reveil.heure}&actif=${reveil.actif}")
+                        navController.navigate(
+                            "modifier_reveil?id=${reveil.id}&createurId=${reveil.createur_id}&nom=$nomEncode&heure=${reveil.heure}&actif=${reveil.actif}&sonId=${reveil.son_id ?: ""}"
+                        )
                     }
                 )
             }
 
-            // Nouvelle route pour la modification d'un réveil avec des paramètres optionnels
             composable(
-                route = "modifier_reveil?id={id}&nom={nom}&heure={heure}&actif={actif}",
+                route = "modifier_reveil?id={id}&createurId={createurId}&nom={nom}&heure={heure}&actif={actif}&sonId={sonId}",
                 arguments = listOf(
                     navArgument("id") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("createurId") { type = NavType.StringType; defaultValue = "" },
                     navArgument("nom") { type = NavType.StringType; defaultValue = "" },
                     navArgument("heure") { type = NavType.StringType; defaultValue = "07:30" },
-                    navArgument("actif") { type = NavType.BoolType; defaultValue = true }
+                    navArgument("actif") { type = NavType.BoolType; defaultValue = true },
+                    navArgument("sonId") { type = NavType.StringType; defaultValue = "" }
                 )
             ) { backStackEntry ->
-                // Récupération des paramètres depuis la route
                 val id = backStackEntry.arguments?.getString("id") ?: ""
+                val createurId = backStackEntry.arguments?.getString("createurId") ?: ""
                 val nom = Uri.decode(backStackEntry.arguments?.getString("nom") ?: "")
                 val heure = backStackEntry.arguments?.getString("heure") ?: "07:30"
                 val actif = backStackEntry.arguments?.getBoolean("actif") ?: true
+                val sonId = backStackEntry.arguments?.getString("sonId")?.takeIf { it.isNotEmpty() }
 
-                // On recrée l'objet Reveil temporaire pour l'interface
                 val reveilSelectionne = Reveil(
                     id = id,
-                    createur_id = "",
+                    createur_id = createurId,
                     nom = nom,
                     heure = heure,
-                    actif = actif
+                    actif = actif,
+                    son_id = sonId
                 )
 
                 EcranModificationReveil(
                     reveil = reveilSelectionne,
-                    onRetour = { navController.popBackStack() } // Retourne à l'écran précédent
+                    onRetour = { navController.popBackStack() }
                 )
             }
 

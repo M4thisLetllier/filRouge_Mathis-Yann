@@ -2,6 +2,8 @@ package ca.uqac.c8INF865.test.repository
 
 import ca.uqac.c8INF865.test.data.Reveil
 import ca.uqac.c8INF865.test.data.Son
+import ca.uqac.c8INF865.test.data.Son
+import ca.uqac.c8INF865.test.data.Utilisateur
 import ca.uqac.c8INF865.test.network.Supabase
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.Dispatchers
@@ -205,6 +207,48 @@ class ReveilRepository {
             } catch (e: Exception) {
                 android.util.Log.e("SupabaseReveil", "Erreur assignation son", e)
                 false
+            }
+        }
+    }
+
+    suspend fun assignerSonCreateur(idReveil: String, idSon: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                db.from("reveils").update(MembreSonUpdate(idSon)) {
+                    filter { eq("id", idReveil) }
+                }
+                true
+            } catch (e: Exception) {
+                android.util.Log.e("SupabaseReveil", "Erreur assignation son createur", e)
+                false
+            }
+        }
+    }
+
+    suspend fun recupererSonsParIds(sonIds: List< String >): Map< String, Son > {
+        return withContext(Dispatchers.IO) {
+            if (sonIds.isEmpty()) return@withContext emptyMap()
+            try {
+                db.from("sons")
+                    .select { filter { isIn("id", sonIds) } }
+                    .decodeList< Son >()
+                    .associateBy { it.id }
+            } catch (e: Exception) {
+                emptyMap()
+            }
+        }
+    }
+
+    suspend fun recupererUtilisateursParIds(userIds: List< String >): Map< String, Utilisateur > {
+        return withContext(Dispatchers.IO) {
+            if (userIds.isEmpty()) return@withContext emptyMap()
+            try {
+                db.from("utilisateurs")
+                    .select { filter { isIn("id", userIds) } }
+                    .decodeList< Utilisateur >()
+                    .associateBy { it.id }
+            } catch (e: Exception) {
+                emptyMap()
             }
         }
     }
