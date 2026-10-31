@@ -2,7 +2,6 @@ package ca.uqac.c8INF865.test.repository
 
 import ca.uqac.c8INF865.test.data.Reveil
 import ca.uqac.c8INF865.test.data.Son
-import ca.uqac.c8INF865.test.data.Son
 import ca.uqac.c8INF865.test.data.Utilisateur
 import ca.uqac.c8INF865.test.network.Supabase
 import io.github.jan.supabase.postgrest.postgrest
