@@ -21,8 +21,6 @@ import ca.uqac.c8INF865.test.network.Supabase
 import ca.uqac.c8INF865.test.viewModel.ContactViewModel
 import ca.uqac.c8INF865.test.viewModel.ReveilViewModel
 import ca.uqac.c8INF865.test.viewModel.SonViewModel
-import androidx.compose.ui.platform.LocalContext
-import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.auth
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,10 +50,6 @@ fun EcranModificationReveil(
     // Vérifie si l'utilisateur connecté est le créateur
     val estCreateur = estNouveau || reveilActuel.createur_id == currentUserId
 
-    val idsAssocies = contactsAssocies.map { it.membreId }
-    val contactsAssociesDonnees = contactsParReveil[reveil.id].orEmpty()
-    val contactsAssociesIds = contactsAssociesDonnees.map { it.membreId }.toSet()
-    val currentUserId = Supabase.client.auth.currentUserOrNull()?.id
     // Couleur dominante : Primaire si créateur, Vert si invité
     val couleurDominante = if (estCreateur) MaterialTheme.colorScheme.primary else Color(0xFF2E7D32)
 
@@ -138,20 +132,9 @@ fun EcranModificationReveil(
                     if (estNouveau) {
                         reveilViewModel.ajouterReveil(nom, heure)
                     } else {
-                        // On prend la variable locale utilisée dans votre écran (reveil ou reveilActuel)
-                        reveilViewModel.modifierReveil(reveil.id, nom, heure)
-
-                        // On reprogramme l'alarme du téléphone avec les nouvelles données et le son associé
-                        if (reveil.actif) {
-                            val son = contactsAssociesDonnees.firstOrNull {
-                                it.membreId == currentUserId
-                            }
-                            programmerAlarmeReveil(
-                                context,
-                                reveil.copy(nom = nom, heure = heure),
-                                son?.sonId,
-                                son?.sonUrl
-                            )
+                        reveilViewModel.modifierReveil(reveilActuel.id, nom, heure)
+                        if (reveilActuel.actif) {
+                            programmerAlarmeReveil(context, reveilActuel.copy(nom = nom, heure = heure))
                         }
                     }
                     onRetour()

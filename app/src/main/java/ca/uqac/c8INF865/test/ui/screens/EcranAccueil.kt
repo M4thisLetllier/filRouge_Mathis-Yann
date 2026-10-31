@@ -241,12 +241,18 @@ fun CarteReveil(
 ) {
     val isActif = reveil.actif
     val nombreAmis = contactsAssocies.size
+
+    // Détection du créateur
+    val currentUserId = Supabase.client.auth.currentUserOrNull()?.id
+    val estCreateur = reveil.createur_id == currentUserId || reveil.createur_id.isEmpty()
+
+    val couleurDominante = if (estCreateur) MaterialTheme.colorScheme.primary else Color(0xFF2E7D32)
     val couleurFond = if (isActif) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant
 
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = couleurFond),
-        border = BorderStroke(1.dp, Color.LightGray),
+        border = BorderStroke(3.dp, if (isActif && !estCreateur) couleurDominante else Color.LightGray),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
