@@ -44,6 +44,25 @@ class SonViewModel : ViewModel() {
     }
 
     fun supprimer(son: Son) {
-        // TODO: On l'ajoutera dans le repository juste après !
+        viewModelScope.launch {
+            // Appel au repository pour supprimer le fichier et la donnée
+            val succes = repository.supprimerSon(son)
+
+            if (succes) {
+                // Rafraîchir la liste après la suppression
+                // (Remplacez chargerSons() par le nom exact de votre fonction de rechargement)
+                chargerSons()
+            }
+        }
+    }
+
+    fun renommerSon(son: Son, nouveauNom: String) {
+        viewModelScope.launch {
+            val succes = repository.modifierNomSon(son.id, nouveauNom)
+            if (succes) {
+                // Remplacez 'chargerSons()' par le nom de votre fonction qui récupère la liste
+                chargerSons()
+            }
+        }
     }
 }

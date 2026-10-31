@@ -55,4 +55,46 @@ class SonRepository {
             false
         }
     }
+
+    suspend fun modifierNomSon(sonId: String, nouveauNom: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                db.from("sons").update(
+                    {
+                        set("nom", nouveauNom)
+                    }
+                ) {
+                    filter { eq("id", sonId) }
+                }
+                true
+            } catch (e: Exception) {
+                android.util.Log.e("SupabaseStorage", "Erreur modification nom", e)
+                false
+            }
+        }
+    }
+
+    suspend fun supprimerSon(son: Son): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                // 1. Extraire le nom du fichier à partir de l'URL publique
+                // (ex: https://.../sons/123_456.3gp -> "123_456.3gp")
+                val nomFichier = son.url.substringAfterLast("/")
+
+                // 2. Supprimer le fichier du Storage de Supabase
+                val bucket = Supabase.client.storage.from("sons")
+                bucket.delete(nomFichier) // delete prend une liste ou un vararg de noms de fichiers
+
+                // 3. Supprimer l'entrée dans la base de données SQL
+                db.from("sons").delete {
+                    filter { eq("id", son.id) }
+                }
+
+                true
+            } catch (e: Exception) {
+                android.util.Log.e("SupabaseStorage", "Erreur suppression son", e)
+                false
+            }
+        }
+    }
 }

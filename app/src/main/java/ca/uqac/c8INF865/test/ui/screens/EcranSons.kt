@@ -142,7 +142,7 @@ fun EcranSons(
                     }
                 )
             } else {
-                ListeSons(sons, sonViewModel::supprimer)
+                ListeSons(sons, sonViewModel::supprimer, onRenommer = sonViewModel::renommerSon)
             }
         }
     }
@@ -205,7 +205,11 @@ private fun Enregistreur(
 }
 
 @Composable
-private fun ListeSons(sons: List<Son>, onSupprimer: (Son) -> Unit) {
+private fun ListeSons(
+    sons: List<Son>,
+    onSupprimer: (Son) -> Unit,
+    onRenommer: (Son, String) -> Unit // NOUVEAU PARAMÈTRE
+) {
     if (sons.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("Aucun enregistrement", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -218,24 +222,30 @@ private fun ListeSons(sons: List<Son>, onSupprimer: (Son) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         items(sons, key = { it.id }) { son ->
-            CarteSon(son, onSupprimer)
+            CarteSon(
+                son = son,
+                onSupprimer = onSupprimer,
+                onRenommer = onRenommer
+            )
         }
     }
 }
 
 @Composable
-private fun CarteSon(son: Son, onSupprimer: (Son) -> Unit) {
+private fun CarteSon(
+    son: Son,
+    onSupprimer: (Son) -> Unit,
+    onRenommer: (Son, String) -> Unit // NOUVEAU PARAMÈTRE
+) {
     var lecture by remember(son.url) { mutableStateOf(false) }
-    var afficherConfirmation by remember { mutableStateOf(false) }
+    var afficherConfirmationSuppression by remember { mutableStateOf(false) }
+    var afficherBoiteRenommer by remember { mutableStateOf(false) } // NOUVEAU
+    var nouveauNom by remember { mutableStateOf(son.nom) } // NOUVEAU
 
-    // Le MediaPlayer lit désormais directement l'URL Firebase
     val lecteur = remember(son.url) {
         MediaPlayer().apply {
             setDataSource(son.url)
-            prepareAsync() // Asynchrone car téléchargement réseau
-            setOnPreparedListener {
-                // Optionnel : Activer le bouton play seulement quand prêt
-            }
+            prepareAsync()
             setOnCompletionListener { lecture = false }
         }
     }
@@ -249,7 +259,9 @@ private fun CarteSon(son: Son, onSupprimer: (Son) -> Unit) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = {
@@ -261,28 +273,71 @@ private fun CarteSon(son: Son, onSupprimer: (Son) -> Unit) {
                     contentDescription = if (lecture) "Mettre en pause" else "Écouter"
                 )
             }
+
             Text(son.nom, Modifier.weight(1f))
-            IconButton(onClick = { afficherConfirmation = true }) {
+
+            // NOUVEAU BOUTON : Renommer
+            IconButton(onClick = {
+                nouveauNom = son.nom // Réinitialiser le texte avec le nom actuel
+                afficherBoiteRenommer = true
+            }) {
+                Icon(Icons.Default.Edit, contentDescription = "Renommer")
+            }
+
+            IconButton(onClick = { afficherConfirmationSuppression = true }) {
                 Icon(Icons.Default.Delete, contentDescription = "Supprimer")
             }
         }
     }
 
-    if (afficherConfirmation) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { afficherConfirmation = false },
-            title = { Text("Supprimer la note vocale ?") },
+    // BOÎTE DE DIALOGUE : Renommer
+    if (afficherBoiteRenommer) {
+        AlertDialog(
+            onDismissRequest = { afficherBoiteRenommer = false },
+            title = { Text("Renommer le son") },
             text = {
-                Text("Voulez-vous vraiment supprimer ${son.nom} ? Cette action est irréversible.")
+                OutlinedTextField(
+                    value = nouveauNom,
+                    onValueChange = { nouveauNom = it },
+                    label = { Text("Nom du son") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
             },
             confirmButton = {
-                androidx.compose.material3.TextButton(
+                TextButton(
+                    onClick = {
+                        if (nouveauNom.isNotBlank() && nouveauNom != son.nom) {
+                            onRenommer(son, nouveauNom.trim())
+                        }
+                        afficherBoiteRenommer = false
+                    }
+                ) {
+                    Text("Enregistrer")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { afficherBoiteRenommer = false }) {
+                    Text("Annuler")
+                }
+            }
+        )
+    }
+
+    // BOÎTE DE DIALOGUE : Supprimer (inchangée)
+    if (afficherConfirmationSuppression) {
+        AlertDialog(
+            onDismissRequest = { afficherConfirmationSuppression = false },
+            title = { Text("Supprimer la note vocale ?") },
+            text = { Text("Voulez-vous vraiment supprimer ${son.nom} ? Cette action est irréversible.") },
+            confirmButton = {
+                TextButton(
                     onClick = {
                         if (lecture) {
                             lecteur.stop()
                             lecture = false
                         }
-                        afficherConfirmation = false
+                        afficherConfirmationSuppression = false
                         onSupprimer(son)
                     }
                 ) {
@@ -290,9 +345,7 @@ private fun CarteSon(son: Son, onSupprimer: (Son) -> Unit) {
                 }
             },
             dismissButton = {
-                androidx.compose.material3.TextButton(
-                    onClick = { afficherConfirmation = false }
-                ) {
+                TextButton(onClick = { afficherConfirmationSuppression = false }) {
                     Text("Annuler")
                 }
             }
