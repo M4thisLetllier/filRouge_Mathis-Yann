@@ -14,7 +14,15 @@ private data class ReveilInfosUpdate(val nom: String, val heure: String)
 private data class ReveilActifUpdate(val actif: Boolean)
 
 @Serializable
-    private data class ReveilMembreRelation(val reveil_id: String, val membre_id: String)
+private data class ReveilMembreRelation(
+    val reveil_id: String,
+    val membre_id: String,
+    val son_id: String? = null // Empêche le crash de sérialisation
+)
+@Serializable
+private data class MembreSonUpdate(val son_id: String)
+
+data class MembreReveilInfo(val membreId: String, val sonId: String?)
 
 class ReveilRepository {
     private val db = Supabase.client.postgrest
@@ -49,7 +57,7 @@ class ReveilRepository {
         }
     }
 
-    suspend fun recupererMembresParReveil(reveilIds: List<String>): Map<String, Set<String>> {
+    suspend fun recupererMembresParReveil(reveilIds: List<String>): Map<String, List<MembreReveilInfo>> {
         return withContext(Dispatchers.IO) {
             if (reveilIds.isEmpty()) return@withContext emptyMap()
             try {
@@ -57,9 +65,11 @@ class ReveilRepository {
                     .select { filter { isIn("reveil_id", reveilIds) } }
                     .decodeList<ReveilMembreRelation>()
 
-                // Grouper les membre_id par reveil_id
-                relations.groupBy({ it.reveil_id }, { it.membre_id })
-                    .mapValues { it.value.toSet() }
+                // On groupe par réveil, mais on garde l'ID du membre ET l'ID du son
+                relations.groupBy(
+                    keySelector = { it.reveil_id },
+                    valueTransform = { MembreReveilInfo(it.membre_id, it.son_id) }
+                )
             } catch (e: Exception) {
                 emptyMap()
             }
@@ -139,6 +149,23 @@ class ReveilRepository {
                 }
                 true
             } catch (e: Exception) {
+                false
+            }
+        }
+    }
+
+    suspend fun assignerSonMembre(idReveil: String, idContact: String, idSon: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                db.from("reveil_membres").update(MembreSonUpdate(idSon)) {
+                    filter {
+                        eq("reveil_id", idReveil)
+                        eq("membre_id", idContact)
+                    }
+                }
+                true
+            } catch (e: Exception) {
+                android.util.Log.e("SupabaseReveil", "Erreur assignation son", e)
                 false
             }
         }

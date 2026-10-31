@@ -178,7 +178,8 @@ fun EcranAccueilReveil(
                 items(reveils.listeReveils) { reveil ->
                     CarteReveil(
                         reveil = reveil,
-                        contactsAssocies = contactsParReveil[reveil.id].orEmpty(),
+
+                        contactsAssocies = contactsParReveil[reveil.id].orEmpty().map { it.membreId }.toSet(),
                         onClick = { onModifierReveil(reveil) },
                         onEtatChange = { actif ->
                             reveilViewModel.basculerEtatReveil(reveil.id, actif)
@@ -190,6 +191,7 @@ fun EcranAccueilReveil(
                         }
                     )
                 }
+
             }
 
             // L'indicateur visuel de chargement

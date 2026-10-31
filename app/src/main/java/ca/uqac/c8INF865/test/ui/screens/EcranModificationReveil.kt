@@ -42,6 +42,10 @@ fun EcranModificationReveil(
     var heure by remember(reveil.heure) { mutableStateOf(reveil.heure) }
     val contactsAssocies = contactsParReveil[reveil.id].orEmpty()
 
+    val idsAssocies = contactsAssocies.map { it.membreId }
+    val contactsAssociesDonnees = contactsParReveil[reveil.id].orEmpty()
+    val contactsAssociesIds = contactsAssociesDonnees.map { it.membreId }.toSet()
+
     val context = LocalContext.current
 
     Scaffold(
@@ -124,7 +128,7 @@ fun EcranModificationReveil(
                     fontSize = 14.sp
                 )
             } else {
-                val contactsAssociesDetails = contacts.filter { it.id in contactsAssocies }
+                val contactsAssociesDetails = contacts.filter { it.id in contactsAssociesIds }
                 if (contactsAssociesDetails.isEmpty()) {
                     Text("Aucun contact lié.", color = Color.Gray)
                 } else {
@@ -136,9 +140,14 @@ fun EcranModificationReveil(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(contact.nom, fontWeight = FontWeight.SemiBold)
 
-                                // Menu déroulant pour la sélection du son
                                 var menuDeroulantOuvert by remember { mutableStateOf(false) }
-                                var sonSelectionne by remember { mutableStateOf<Son?>(null) } // Vous devrez lier ceci au ViewModel
+
+                                //On cherche le son enregistré dans la BDD pour ce contact précis
+                                val donneeRelation = contactsAssociesDonnees.find { it.membreId == contact.id }
+                                val sonEnregistre = sons.find { it.id == donneeRelation?.sonId }
+
+                                // remember(sonEnregistre) permet de forcer la mise à jour si la BDD change
+                                var sonSelectionne by remember(sonEnregistre) { mutableStateOf(sonEnregistre) }
 
                                 Box {
                                     TextButton(
@@ -166,7 +175,7 @@ fun EcranModificationReveil(
                                                 onClick = {
                                                     sonSelectionne = son
                                                     menuDeroulantOuvert = false
-                                                    // TODO : Appeler une fonction dans ReveilViewModel pour sauvegarder "son.id" dans "reveil_membres"
+                                                    reveilViewModel.assignerSonContact(reveil.id, contact.id, son.id)
                                                 }
                                             )
                                         }
@@ -183,7 +192,7 @@ fun EcranModificationReveil(
                 var afficherAjoutContact by remember { mutableStateOf(false) }
                 OutlinedButton(
                     onClick = { afficherAjoutContact = true },
-                    enabled = contacts.any { it.id !in contactsAssocies },
+                    enabled = contacts.any { it.id !in idsAssocies },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null)
@@ -193,7 +202,7 @@ fun EcranModificationReveil(
 
                 if (afficherAjoutContact) {
                     SelectionContacts(
-                        contacts = contacts.filter { it.id !in contactsAssocies },
+                        contacts = contacts.filter { it.id !in idsAssocies },
                         onDismiss = { afficherAjoutContact = false },
                         onConfirm = { ids ->
                             ids.forEach { reveilViewModel.basculerContact(reveil.id, it, true) }

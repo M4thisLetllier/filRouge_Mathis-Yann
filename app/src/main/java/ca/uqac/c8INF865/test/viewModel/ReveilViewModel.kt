@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import ca.uqac.c8INF865.test.repository.MembreReveilInfo
 
 data class AccueilUiState(
     val listeReveils: List<Reveil> = emptyList()
@@ -21,8 +22,8 @@ class ReveilViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(AccueilUiState())
     val uiState: StateFlow<AccueilUiState> = _uiState.asStateFlow()
 
-    private val _contactsParReveil = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
-    val contactsParReveil: StateFlow<Map<String, Set<String>>> = _contactsParReveil.asStateFlow()
+    private val _contactsParReveil = MutableStateFlow<Map<String, List<MembreReveilInfo>>>(emptyMap())
+    val contactsParReveil: StateFlow<Map<String,List<MembreReveilInfo>>> = _contactsParReveil.asStateFlow()
 
     init {
         chargerReveils()
@@ -77,6 +78,15 @@ class ReveilViewModel : ViewModel() {
         viewModelScope.launch {
             val succes = repository.basculerMembre(idReveil, idContact, associe)
             if (succes) chargerReveils()
+        }
+    }
+
+    fun assignerSonContact(idReveil: String, idContact: String, idSon: String) {
+        viewModelScope.launch {
+            val succes = repository.assignerSonMembre(idReveil, idContact, idSon)
+            if (succes) {
+                chargerReveils() // Rafraîchit les données après l'ajout
+            }
         }
     }
 }
