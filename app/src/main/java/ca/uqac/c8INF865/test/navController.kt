@@ -1,5 +1,6 @@
 package ca.uqac.c8INF865.test
 
+import android.net.Uri
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -19,17 +20,22 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 
 import ca.uqac.c8INF865.test.ui.screens.EcranAccueilReveil
 import ca.uqac.c8INF865.test.ui.screens.EcranContact
 import ca.uqac.c8INF865.test.ui.screens.EcranSons
+import ca.uqac.c8INF865.test.ui.screens.PageConnexion
+import ca.uqac.c8INF865.test.ui.screens.EcranModificationReveil
 import ca.uqac.c8INF865.test.ui.screens.EcranProfil
-import ca.uqac.c8INF865.test.ui.screens.PageConnexion // Nouveau nom de ton écran de connexion
+import ca.uqac.c8INF865.test.data.Reveil
 import ca.uqac.c8INF865.test.viewModel.AuthViewModel
+
 
 import ca.uqac.c8INF865.test.network.Supabase
 import io.github.jan.supabase.gotrue.auth
@@ -52,7 +58,8 @@ fun MonApp() {
 
     // 2. Observer la route actuelle pour masquer la barre sur l'écran de connexion
     val currentDestination = navController.currentBackStackEntryAsState().value?.destination
-    val afficherBarreNavigation = currentDestination?.route != "connexion"
+    val routeActuelle = currentDestination?.route?.substringBefore("?") // Ignore les paramètres de route
+    val afficherBarreNavigation = routeActuelle in listOf("accueil", "social", "sons")
 
     Scaffold(
         topBar = {
@@ -87,7 +94,7 @@ fun MonApp() {
                             icon = { Icon(item.icon, contentDescription = item.label) },
                             label = { Text(item.label) },
                             selected = currentDestination?.hierarchy?.any {
-                                it.route == item.route
+                                it.route?.substringBefore("?") == item.route
                             } == true,
                             onClick = {
                                 navController.navigate(item.route) {
@@ -106,7 +113,7 @@ fun MonApp() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = destinationDepart, // 4. Utiliser la variable dynamique
+            startDestination = destinationDepart,
             modifier = Modifier.padding(innerPadding)
         ) {
             // 5. Ajouter la route pour la connexion
@@ -120,12 +127,53 @@ fun MonApp() {
                     }
                 )
             }
+
+            // Écran d'accueil mis à jour pour intercepter le clic sur un réveil
             composable("accueil") {
-                EcranAccueilReveil()
+                EcranAccueilReveil(
+                    onModifierReveil = { reveil ->
+                        // On encode le nom avec Uri.encode pour supporter les espaces et caractères spéciaux
+                        val nomEncode = Uri.encode(reveil.nom)
+                        navController.navigate("modifier_reveil?id=${reveil.id}&nom=$nomEncode&heure=${reveil.heure}&actif=${reveil.actif}")
+                    }
+                )
             }
+
+            // Nouvelle route pour la modification d'un réveil avec des paramètres optionnels
+            composable(
+                route = "modifier_reveil?id={id}&nom={nom}&heure={heure}&actif={actif}",
+                arguments = listOf(
+                    navArgument("id") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("nom") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("heure") { type = NavType.StringType; defaultValue = "07:30" },
+                    navArgument("actif") { type = NavType.BoolType; defaultValue = true }
+                )
+            ) { backStackEntry ->
+                // Récupération des paramètres depuis la route
+                val id = backStackEntry.arguments?.getString("id") ?: ""
+                val nom = Uri.decode(backStackEntry.arguments?.getString("nom") ?: "")
+                val heure = backStackEntry.arguments?.getString("heure") ?: "07:30"
+                val actif = backStackEntry.arguments?.getBoolean("actif") ?: true
+
+                // On recrée l'objet Reveil temporaire pour l'interface
+                val reveilSelectionne = Reveil(
+                    id = id,
+                    createur_id = "",
+                    nom = nom,
+                    heure = heure,
+                    actif = actif
+                )
+
+                EcranModificationReveil(
+                    reveil = reveilSelectionne,
+                    onRetour = { navController.popBackStack() } // Retourne à l'écran précédent
+                )
+            }
+
             composable("social") {
                 EcranContact()
             }
+
             composable("sons") {
                 EcranSons()
             }
