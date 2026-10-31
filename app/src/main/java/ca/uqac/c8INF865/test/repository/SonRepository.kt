@@ -26,31 +26,33 @@ class SonRepository {
         }
     }
 
+    // Exemple d'implémentation pour SonRepository
     suspend fun uploaderSon(userId: String, nom: String, cheminLocal: String): Boolean {
-        return withContext(Dispatchers.IO) {
-            try {
-                val fichier = File(cheminLocal)
-                val cheminStorage = "$userId/${fichier.name}"
+        return try {
+            val fichier = java.io.File(cheminLocal)
+            val extension = fichier.extension
+            val nomFichierUnique = "${userId}_${System.currentTimeMillis()}.$extension"
 
-                // 1. Upload dans le bucket "audios"
-                val bucket = storage.from("audios")
-                bucket.upload(cheminStorage, fichier.readBytes())
+            // 1. Upload dans le Storage
+            val bucket = Supabase.client.storage.from("sons")
+            bucket.upload(nomFichierUnique, fichier.readBytes())
 
-                // 2. Récupération de l'URL publique
-                val urlPublique = bucket.publicUrl(cheminStorage)
+            // 2. Récupération de l'URL publique
+            val urlPublique = bucket.publicUrl(nomFichierUnique)
 
-                // 3. Sauvegarde dans la table SQL "sons"
-                val nouveauSon = mapOf(
-                    "utilisateur_id" to userId,
-                    "nom" to nom,
-                    "url" to urlPublique
-                )
-                db.from("sons").insert(nouveauSon)
-                true
-            } catch (e: Exception) {
-                android.util.Log.e("Supabase", "Erreur upload", e)
-                false
-            }
+            // 3. Sauvegarde dans la table SQL 'sons'
+            val nouveauSon = Son(
+                id = java.util.UUID.randomUUID().toString(),
+                utilisateur_id = userId,
+                nom = nom,
+                url = urlPublique
+            )
+            Supabase.client.postgrest.from("sons").insert(nouveauSon)
+
+            true
+        } catch (e: Exception) {
+            android.util.Log.e("SupabaseStorage", "Erreur d'upload", e)
+            false
         }
     }
 }

@@ -75,7 +75,12 @@ fun EcranSons(
         }
         val dossier = File(context.filesDir, "sons").apply { mkdirs() }
         val fichier = File(dossier, "son_${System.currentTimeMillis()}.3gp")
-        val nouveauRecorder = MediaRecorder().apply {
+        val nouveauRecorder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            MediaRecorder(context)
+        } else {
+            @Suppress("DEPRECATION")
+            MediaRecorder()
+        }.apply {
             setAudioSource(MediaRecorder.AudioSource.MIC)
             setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP)
             setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
