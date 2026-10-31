@@ -3,6 +3,8 @@ package ca.uqac.c8INF865.test.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -24,21 +26,22 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ca.uqac.c8INF865.test.data.Utilisateur
 import ca.uqac.c8INF865.test.viewModel.ContactViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EcranContact(
     contactViewModel: ContactViewModel = viewModel()
 ) {
-    // États existants
     val contacts by contactViewModel.contacts.collectAsState()
     val erreur by contactViewModel.messageErreur.collectAsState()
     val texteRecherche = contactViewModel.recherche.trim()
-
     val demandes by contactViewModel.demandes.collectAsState()
 
-    // Gestion des onglets (0 = Amis, 1 = Demandes)
-    var onglet by remember { mutableIntStateOf(0) }
+    // NOUVEAU : Gestion du Pager (Swipe)
+    val pagerState = rememberPagerState(pageCount = { 2 })
+    val coroutineScope = rememberCoroutineScope()
+
     var afficherAjoutContact by remember { mutableStateOf(false) }
 
     val contactsFiltres = contacts.filter { contact ->
@@ -48,8 +51,8 @@ fun EcranContact(
 
     Scaffold(
         floatingActionButton = {
-            // On affiche le bouton d'ajout uniquement sur l'onglet "Mes amis"
-            if (onglet == 0) {
+            // S'affiche uniquement sur l'onglet "Mes amis" (page 0)
+            if (pagerState.currentPage == 0) {
                 FloatingActionButton(
                     onClick = {
                         contactViewModel.effacerErreur()
@@ -71,77 +74,89 @@ fun EcranContact(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // NOUVEAU : Les onglets de navigation
-            TabRow(selectedTabIndex = onglet) {
+            TabRow(selectedTabIndex = pagerState.currentPage) {
                 listOf("Mes amis", "Demandes").forEachIndexed { index, titre ->
                     Tab(
-                        selected = onglet == index,
-                        onClick = { onglet = index },
+                        selected = pagerState.currentPage == index,
+                        onClick = {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(index)
+                            }
+                        },
                         text = { Text(titre) }
                     )
                 }
             }
 
-            if (onglet == 0) {
-                // CONTENU DE L'ONGLET 0 : MES AMIS
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = contactViewModel.recherche,
-                    onValueChange = { contactViewModel.modifierRecherche(it) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    placeholder = { Text("Rechercher un contact...") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Icône de recherche"
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                if (page == 0) {
+                    // CONTENU DE L'ONGLET 0 : MES AMIS
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = contactViewModel.recherche,
+                            onValueChange = { contactViewModel.modifierRecherche(it) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            placeholder = { Text("Rechercher un contact...") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Icône de recherche"
+                                )
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(24.dp)
                         )
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(24.dp)
-                )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                if (contactsFiltres.isEmpty()) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Aucun ami trouvé", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(contactsFiltres) { contact ->
-                            ContactCard(
-                                contact = contact,
-                                onSupprimer = { contactViewModel.supprimer(contact) }
-                            )
+                        if (contactsFiltres.isEmpty()) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("Aucun ami trouvé", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(contactsFiltres) { contact ->
+                                    ContactCard(
+                                        contact = contact,
+                                        onSupprimer = { contactViewModel.supprimer(contact) }
+                                    )
+                                }
+                            }
                         }
                     }
-                }
-            } else {
-                // CONTENU DE L'ONGLET 1 : DEMANDES D'AMIS
-                Spacer(modifier = Modifier.height(16.dp))
-
-                if (demandes.isEmpty()) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Aucune demande en attente", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
                 } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(demandes) { demandeur ->
-                            DemandeCard(
-                                contact = demandeur,
-                                onAccepter = { contactViewModel.accepterDemande(demandeur) },
-                                onRefuser = { contactViewModel.refuserDemande(demandeur) }
-                            )
+                    // CONTENU DE L'ONGLET 1 : DEMANDES D'AMIS
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        if (demandes.isEmpty()) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("Aucune demande en attente", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(demandes) { demandeur ->
+                                    DemandeCard(
+                                        contact = demandeur,
+                                        onAccepter = { contactViewModel.accepterDemande(demandeur) },
+                                        onRefuser = { contactViewModel.refuserDemande(demandeur) }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -154,7 +169,6 @@ fun EcranContact(
             erreur = erreur,
             onDismiss = { afficherAjoutContact = false },
             onConfirm = { telephone ->
-                // Cette méthode devrait maintenant insérer dans "demandes_amis" et non "amis"
                 contactViewModel.ajouterContact(telephone)
                 if (erreur == null) {
                     afficherAjoutContact = false

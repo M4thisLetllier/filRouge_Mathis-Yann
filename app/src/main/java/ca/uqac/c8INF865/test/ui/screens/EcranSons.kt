@@ -9,6 +9,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -23,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ca.uqac.c8INF865.test.data.Son
 import ca.uqac.c8INF865.test.viewModel.SonViewModel
+import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -34,7 +37,11 @@ fun EcranSons(
 ) {
     val context = LocalContext.current
     val sons by sonViewModel.sons.collectAsState()
-    var onglet by remember { mutableIntStateOf(0) }
+
+    // NOUVEAU : Gestion du Pager (Swipe)
+    val pagerState = rememberPagerState(pageCount = { 2 })
+    val coroutineScope = rememberCoroutineScope()
+
     var enregistrement by remember { mutableStateOf(false) }
     var fichierTemporaire by remember { mutableStateOf<File?>(null) }
     var permissionAccordee by remember {
@@ -106,43 +113,59 @@ fun EcranSons(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            TabRow(selectedTabIndex = onglet) {
+            TabRow(selectedTabIndex = pagerState.currentPage) {
                 listOf("Enregistrer", "Mes sons").forEachIndexed { index, titre ->
                     Tab(
-                        selected = onglet == index,
-                        onClick = { if (!enregistrement) onglet = index },
+                        selected = pagerState.currentPage == index,
+                        onClick = {
+                            if (!enregistrement) {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(index)
+                                }
+                            }
+                        },
                         text = { Text(titre) }
                     )
                 }
             }
-            if (onglet == 0) {
-                Enregistreur(
-                    enregistrement = enregistrement,
-                    secondes = secondes,
-                    fichierPret = fichierTemporaire != null && !enregistrement,
-                    onCommencer = ::commencer,
-                    onArreter = ::arreter,
-                    onRefaire = {
-                        fichierTemporaire?.delete()
-                        fichierTemporaire = null
-                    },
-                    onSauvegarder = {
-                        fichierTemporaire?.let { fichier ->
-                            // Envoi vers Firebase Storage
-                            sonViewModel.uploaderSon(
-                                nom = "Enregistrement " + SimpleDateFormat(
-                                    "dd/MM/yyyy HH:mm",
-                                    Locale.getDefault()
-                                ).format(Date()),
-                                cheminLocal = fichier.absolutePath
-                            )
+
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                userScrollEnabled = !enregistrement // Bloque le swipe pendant l'enregistrement
+            ) { page ->
+                if (page == 0) {
+                    Enregistreur(
+                        enregistrement = enregistrement,
+                        secondes = secondes,
+                        fichierPret = fichierTemporaire != null && !enregistrement,
+                        onCommencer = ::commencer,
+                        onArreter = ::arreter,
+                        onRefaire = {
+                            fichierTemporaire?.delete()
+                            fichierTemporaire = null
+                        },
+                        onSauvegarder = {
+                            fichierTemporaire?.let { fichier ->
+                                // Envoi vers Firebase Storage
+                                sonViewModel.uploaderSon(
+                                    nom = "Enregistrement " + SimpleDateFormat(
+                                        "dd/MM/yyyy HH:mm",
+                                        Locale.getDefault()
+                                    ).format(Date()),
+                                    cheminLocal = fichier.absolutePath
+                                )
+                            }
+                            fichierTemporaire = null
+                            // On bascule automatiquement sur la page "Mes sons" après sauvegarde
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(1)
+                            }
                         }
-                        fichierTemporaire = null
-                        onglet = 1
-                    }
-                )
-            } else {
-                ListeSons(sons, sonViewModel::supprimer, onRenommer = sonViewModel::renommerSon)
+                    )
+                } else {
+                    ListeSons(sons, sonViewModel::supprimer, onRenommer = sonViewModel::renommerSon)
+                }
             }
         }
     }
@@ -208,7 +231,7 @@ private fun Enregistreur(
 private fun ListeSons(
     sons: List<Son>,
     onSupprimer: (Son) -> Unit,
-    onRenommer: (Son, String) -> Unit // NOUVEAU PARAMÈTRE
+    onRenommer: (Son, String) -> Unit
 ) {
     if (sons.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -235,12 +258,12 @@ private fun ListeSons(
 private fun CarteSon(
     son: Son,
     onSupprimer: (Son) -> Unit,
-    onRenommer: (Son, String) -> Unit // NOUVEAU PARAMÈTRE
+    onRenommer: (Son, String) -> Unit
 ) {
     var lecture by remember(son.url) { mutableStateOf(false) }
     var afficherConfirmationSuppression by remember { mutableStateOf(false) }
-    var afficherBoiteRenommer by remember { mutableStateOf(false) } // NOUVEAU
-    var nouveauNom by remember { mutableStateOf(son.nom) } // NOUVEAU
+    var afficherBoiteRenommer by remember { mutableStateOf(false) }
+    var nouveauNom by remember { mutableStateOf(son.nom) }
 
     val lecteur = remember(son.url) {
         MediaPlayer().apply {
@@ -276,9 +299,8 @@ private fun CarteSon(
 
             Text(son.nom, Modifier.weight(1f))
 
-            // NOUVEAU BOUTON : Renommer
             IconButton(onClick = {
-                nouveauNom = son.nom // Réinitialiser le texte avec le nom actuel
+                nouveauNom = son.nom
                 afficherBoiteRenommer = true
             }) {
                 Icon(Icons.Default.Edit, contentDescription = "Renommer")
@@ -290,7 +312,6 @@ private fun CarteSon(
         }
     }
 
-    // BOÎTE DE DIALOGUE : Renommer
     if (afficherBoiteRenommer) {
         AlertDialog(
             onDismissRequest = { afficherBoiteRenommer = false },
@@ -324,7 +345,6 @@ private fun CarteSon(
         )
     }
 
-    // BOÎTE DE DIALOGUE : Supprimer (inchangée)
     if (afficherConfirmationSuppression) {
         AlertDialog(
             onDismissRequest = { afficherConfirmationSuppression = false },
