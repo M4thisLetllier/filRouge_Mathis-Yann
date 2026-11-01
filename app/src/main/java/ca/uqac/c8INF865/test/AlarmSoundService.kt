@@ -54,6 +54,15 @@ class AlarmSoundService : Service() {
     }
 
     private fun buildNotification(reveilId: String, channelId: String): Notification {
+        val fullScreenIntent = PendingIntent.getActivity(
+            this,
+            ("fullscreen-$reveilId").hashCode(),
+            Intent(this, MainActivity::class.java).apply {
+                action = MainActivity.ACTION_SHOW_ALARM
+                putExtra("REVEIL_ID", reveilId)
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
         val openApp = PendingIntent.getActivity(
             this,
             reveilId.hashCode(),
@@ -75,6 +84,7 @@ class AlarmSoundService : Service() {
             .setContentText("C'est l'heure de votre réveil !")
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentIntent(openApp)
+            .setFullScreenIntent(fullScreenIntent, true)
             .setOngoing(true)
             .setAutoCancel(false)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Désactiver", dismiss)
