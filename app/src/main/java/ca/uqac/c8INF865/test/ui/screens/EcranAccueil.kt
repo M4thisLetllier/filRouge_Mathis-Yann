@@ -73,10 +73,12 @@ private fun calculerProchaineOccurrence(heureStr: String): Long {
     }.timeInMillis
 }
 
-private fun alarmPendingIntent(context: Context, reveilId: String, sonId: String?): PendingIntent {
+private fun alarmPendingIntent(context: Context, reveilId: String, sonId: String? = null): PendingIntent {
     val intent = Intent(context, AlarmReceiver::class.java).apply {
         putExtra("REVEIL_ID", reveilId)
-        putExtra("SON_ID", sonId)
+        if (sonId != null) {
+            putExtra("SON_ID", sonId) // Correspond exactement à ce qu'attend AlarmReceiver !
+        }
     }
     return PendingIntent.getBroadcast(
         context,
@@ -86,35 +88,38 @@ private fun alarmPendingIntent(context: Context, reveilId: String, sonId: String
     )
 }
 
-fun programmerAlarmeReveil(context: Context, reveil: Reveil, sonId: String? = null, sonUrl: String? = null) {
+fun programmerAlarmeReveil(
+    context: Context,
+    reveil: Reveil,
+    sonId: String? = null,
+    sonUrl: String? = null
+) {
     if (!reveil.actif) return
     val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
     val triggerAtMillis = calculerProchaineOccurrence(reveil.heure)
 
-    CoroutineScope(Dispatchers.IO).launch {
-        val userId = Supabase.client.auth.currentUserOrNull()?.id
-        val sonDepuisBdd = userId?.let {
-            ReveilRepository().recupererSonPourReveil(reveil.id, it)
+    // Téléchargement et mise en cache du son en arrière-plan pour qu'il soit prêt à sonner
+    if (sonId != null && sonUrl != null) {
+        val appContext = context.applicationContext
+        CoroutineScope(Dispatchers.IO).launch {
+            AlarmSoundCache.cache(appContext, sonId, sonUrl)
         }
-        val idDuSon = sonDepuisBdd?.sonId ?: sonId
-        val urlDuSon = sonDepuisBdd?.sonUrl ?: sonUrl
-        if (idDuSon != null && !urlDuSon.isNullOrBlank()) {
-            AlarmSoundCache.cache(context.applicationContext, idDuSon, urlDuSon)
-        }
-        val showIntent = PendingIntent.getActivity(
-            context,
-            reveil.id.hashCode(),
-            Intent(context, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    }
+
+    val showIntent = PendingIntent.getActivity(
+        context,
+        reveil.id.hashCode(),
+        Intent(context, MainActivity::class.java),
+        PendingIntent.FLAG_IMMUTABLE
+    )
+
+    try {
+        alarmManager.setAlarmClock(
+            AlarmManager.AlarmClockInfo(triggerAtMillis, showIntent),
+            alarmPendingIntent(context, reveil.id, sonId)
         )
-        try {
-            alarmManager.setAlarmClock(
-                AlarmManager.AlarmClockInfo(triggerAtMillis, showIntent),
-                alarmPendingIntent(context, reveil.id, idDuSon)
-            )
-        } catch (e: SecurityException) {
-            android.util.Log.e("Alarm", "Permission d'alarme exacte absente", e)
-        }
+    } catch (e: SecurityException) {
+        android.util.Log.e("Alarm", "Permission d'alarme exacte absente", e)
     }
 }
 
@@ -140,9 +145,33 @@ fun EcranAccueilReveil(
         ActivityResultContracts.RequestPermission()
     ) { }
 
+    val sonsAssignes by reveilViewModel.sonsAssignes.collectAsState()
+
+    fun obtenirSonPourUtilisateur(reveil: Reveil): ca.uqac.c8INF865.test.data.Son? {
+        val sonId = if (reveil.createur_id == currentUserId) {
+            reveil.son_id // C'est le créateur : son_id de la table reveils
+        } else {
+            // C'est un membre : son_id de la table reveil_membres
+            contactsParReveil[reveil.id]?.find { it.membreId == currentUserId }?.sonId
+        }
+        return sonId?.let { sonsAssignes[it] }
+    }
+
     // --- MISE À JOUR AUTOMATIQUE AU RETOUR SUR LA PAGE ---
     LaunchedEffect(Unit) {
         reveilViewModel.chargerReveils()
+    }
+
+    // Synchronise et met en cache les sons dès que les réveils ou les sons sont chargés
+    LaunchedEffect(reveils.listeReveils, sonsAssignes, contactsParReveil) {
+        reveils.listeReveils.forEach { reveil ->
+            if (reveil.actif) {
+                val monSon = obtenirSonPourUtilisateur(reveil)
+                programmerAlarmeReveil(context, reveil, monSon?.id, monSon?.url)
+            } else {
+                annulerAlarmeReveil(context, reveil.id)
+            }
+        }
     }
 
     // --- GESTION DU PULL-TO-REFRESH (Version Material 2) ---
@@ -197,19 +226,17 @@ fun EcranAccueilReveil(
                 items(reveils.listeReveils) { reveil ->
                     CarteReveil(
                         reveil = reveil,
-
                         contactsAssocies = contactsParReveil[reveil.id].orEmpty().map { it.membreId }.toSet(),
                         onClick = { onModifierReveil(reveil) },
                         onEtatChange = { actif ->
                             reveilViewModel.basculerEtatReveil(reveil.id, actif)
                             if (actif) {
-                                val son = contactsParReveil[reveil.id].orEmpty()
-                                    .firstOrNull { it.membreId == currentUserId }
+                                val monSon = obtenirSonPourUtilisateur(reveil)
                                 programmerAlarmeReveil(
                                     context,
                                     reveil.copy(actif = true),
-                                    son?.sonId,
-                                    son?.sonUrl
+                                    monSon?.id,
+                                    monSon?.url
                                 )
                             } else {
                                 annulerAlarmeReveil(context, reveil.id)
