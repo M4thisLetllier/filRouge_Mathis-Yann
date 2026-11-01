@@ -145,6 +145,17 @@ fun EcranAccueilReveil(
         reveilViewModel.chargerReveils()
     }
 
+    // S'exécute à chaque fois que la liste des réveils change (chargement initial, pull-to-refresh, modif d'un ami...)
+    LaunchedEffect(reveils.listeReveils) {
+        reveils.listeReveils.forEach { reveil ->
+            if (reveil.actif) {
+                programmerAlarmeReveil(context, reveil)
+            } else {
+                annulerAlarmeReveil(context, reveil.id)
+            }
+        }
+    }
+
     // --- GESTION DU PULL-TO-REFRESH (Version Material 2) ---
     val coroutineScope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
