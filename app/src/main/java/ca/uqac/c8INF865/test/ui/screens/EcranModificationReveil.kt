@@ -134,7 +134,19 @@ fun EcranModificationReveil(
                     } else {
                         reveilViewModel.modifierReveil(reveilActuel.id, nom, heure)
                         if (reveilActuel.actif) {
-                            programmerAlarmeReveil(context, reveilActuel.copy(nom = nom, heure = heure))
+                            val monSonId = if (estCreateur) {
+                                reveilActuel.son_id
+                            } else {
+                                contactsAssociesDonnees.find { it.membreId == currentUserId }?.sonId
+                            }
+                            val monSon = monSonId?.let { sonsAssignes[it] }
+
+                            programmerAlarmeReveil(
+                                context,
+                                reveilActuel.copy(nom = nom, heure = heure),
+                                monSon?.id,
+                                monSon?.url
+                            )
                         }
                     }
                     onRetour()
