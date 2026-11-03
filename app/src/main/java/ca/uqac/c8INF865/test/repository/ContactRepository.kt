@@ -1,45 +1,13 @@
 package ca.uqac.c8INF865.test.repository
 
 import ca.uqac.c8INF865.test.data.Utilisateur
+import ca.uqac.c8INF865.test.data.RelationAmi
+import ca.uqac.c8INF865.test.data.InsertRelationAmi
+import ca.uqac.c8INF865.test.data.DemandeAmi
+import ca.uqac.c8INF865.test.data.InsertDemandeAmi
+
 import ca.uqac.c8INF865.test.network.Supabase
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.serialization.Serializable
-
-// --------------------------------------------------------
-// MODÈLES DE DONNÉES
-// --------------------------------------------------------
-
-// Modèle pour LIRE une relation (l'id est optionnel pour éviter le crash MissingFieldException)
-@Serializable
-data class RelationAmi(
-    val id: String? = null,
-    val utilisateur_id: String,
-    val ami_id: String
-)
-
-// Modèle pour INSÉRER une relation (sans id, Supabase le génère automatiquement)
-@Serializable
-data class InsertRelationAmi(
-    val utilisateur_id: String,
-    val ami_id: String
-)
-
-// Modèle pour LIRE une demande d'ami
-@Serializable
-data class DemandeAmi(
-    val id: String? = null,
-    val expediteur_id: String,
-    val destinataire_id: String,
-    val statut: String
-)
-
-// Modèle pour INSÉRER une demande d'ami
-@Serializable
-data class InsertDemandeAmi(
-    val expediteur_id: String,
-    val destinataire_id: String,
-    val statut: String = "en_attente"
-)
 
 // --------------------------------------------------------
 // REPOSITORY

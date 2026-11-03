@@ -178,7 +178,7 @@ fun EcranContact(
     }
 }
 
-// NOUVEAU COMPOSANT : Carte pour les demandes d'amis
+//Carte pour les demandes d'amis
 @Composable
 fun DemandeCard(contact: Utilisateur, onAccepter: () -> Unit, onRefuser: () -> Unit) {
     Card(

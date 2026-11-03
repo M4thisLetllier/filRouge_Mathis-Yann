@@ -15,16 +15,16 @@ class AuthRepository {
     suspend fun inscription(email: String, motDePasse: String, nom: String, telephone: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                // 1. Création du compte sécurisé Supabase
+                // Création du compte sécurisé Supabase
                 auth.signUpWith(Email) {
                     this.email = email
                     this.password = motDePasse
                 }
 
-                // 2. Récupération de l'ID généré
+                // Récupération de l'ID généré
                 val utilisateurId = auth.currentUserOrNull()?.id ?: return@withContext false
 
-                // 3. Sauvegarde du profil dans notre table SQL
+                // Sauvegarde du profil dans notre table SQL
                 val profil = Utilisateur(
                     id = utilisateurId,
                     nom = nom,
