@@ -47,17 +47,18 @@ fun MonApp() {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = viewModel()
 
-    // 1. Vérifier si un utilisateur est déjà connecté via Supabase
+    // Vérifier si un utilisateur est déjà connecté via Supabase
     val idUtilisateurCourant = Supabase.client.auth.currentUserOrNull()?.id
     val destinationDepart = if (idUtilisateurCourant != null) "accueil" else "connexion"
 
+    //Barre de navigation
     val items = listOf(
         BottomBarItem("accueil", "Réveils", Icons.Filled.Notifications),
         BottomBarItem("social", "Social", Icons.Filled.Group),
         BottomBarItem("sons", "Sons", Icons.Filled.Mic)
     )
 
-    // 2. Observer la route actuelle pour masquer la barre sur l'écran de connexion
+    // Observer la route actuelle pour masquer la barre sur l'écran de connexion
     val currentDestination = navController.currentBackStackEntryAsState().value?.destination
     val routeActuelle = currentDestination?.route?.substringBefore("?") // Ignore les paramètres de route
     val afficherBarreNavigation = routeActuelle in listOf("accueil", "social", "sons")
@@ -87,7 +88,7 @@ fun MonApp() {
             }
         },
         bottomBar = {
-            // 3. Condition pour afficher ou non la barre
+            // Condition pour afficher ou non la barre
             if (afficherBarreNavigation) {
                 NavigationBar {
                     items.forEach { item ->
@@ -120,7 +121,7 @@ fun MonApp() {
                 bottom = innerPadding.calculateBottomPadding()
             )
         ) {
-            // 5. Ajouter la route pour la connexion
+            // Ajouter la route pour la connexion
             composable("connexion") {
                 PageConnexion(
                     authViewModel = authViewModel,
