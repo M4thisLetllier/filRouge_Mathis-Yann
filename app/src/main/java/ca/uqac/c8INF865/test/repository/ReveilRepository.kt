@@ -9,41 +9,60 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
+// --------------------------------------------------------
+// MODÈLES DE DONNÉES
+// --------------------------------------------------------
+
+// Modèle pour mettre à jour les informations d'un réveil
 @Serializable
 private data class ReveilInfosUpdate(val nom: String, val heure: String)
 
+// Modèle pour activer ou désactiver un réveil
 @Serializable
 private data class ReveilActifUpdate(val actif: Boolean)
 
+// Modèle représentant la relation entre un réveil, un membre et son son
 @Serializable
 private data class ReveilMembreRelation(
     val reveil_id: String,
     val membre_id: String,
     val son_id: String? = null // Empêche le crash de sérialisation
 )
+
+// Modèle pour associer un son à un membre
 @Serializable
 private data class MembreSonUpdate(val son_id: String)
 
+// Informations d'un membre associé à un réveil et du son qui lui est attribué
 data class MembreReveilInfo(val membreId: String, val sonId: String?, val sonUrl: String? = null)
+
+// --------------------------------------------------------
+// REPOSITORY
+// --------------------------------------------------------
 
 class ReveilRepository {
     private val db = Supabase.client.postgrest
 
+    // ==========================================
+    // GESTION DES RÉVEILS
+    // ==========================================
+
+    // Récupérer les réveils créés ou partagés avec l'utilisateur
     suspend fun recupererReveils(userId: String): List<Reveil> {
         return withContext(Dispatchers.IO) {
             try {
-                // 1. Récupérer les réveils que l'utilisateur a créés
+                // Récupérer les réveils que l'utilisateur a créés
                 val mesReveils = db.from("reveils")
                     .select { filter { eq("createur_id", userId) } }
                     .decodeList<Reveil>()
 
-                // 2. Récupérer les ID des réveils où l'utilisateur est invité
+                // Récupérer les ID des réveils où l'utilisateur est invité
                 val relationsInvitation = db.from("reveil_membres")
                     .select { filter { eq("membre_id", userId) } }
                     .decodeList<ReveilMembreRelation>()
                 val reveilsInvitesIds = relationsInvitation.map { it.reveil_id }
 
-                // 3. Récupérer les données des réveils invités
+                // Récupérer les données des réveils invités
                 val reveilsInvites = if (reveilsInvitesIds.isNotEmpty()) {
                     db.from("reveils")
                         .select { filter { isIn("id", reveilsInvitesIds) } }
@@ -59,6 +78,7 @@ class ReveilRepository {
         }
     }
 
+    // Récupérer les membres et leurs sons pour plusieurs réveils
     suspend fun recupererMembresParReveil(reveilIds: List<String>): Map<String, List<MembreReveilInfo>> {
         return withContext(Dispatchers.IO) {
             if (reveilIds.isEmpty()) return@withContext emptyMap()
@@ -74,7 +94,7 @@ class ReveilRepository {
                     }
                 }.associateBy { it.id }
 
-                // On groupe par réveil, mais on garde l'ID du membre ET l'ID du son
+                // On groupe par réveil, mais on garde l'ID du membre et l'ID du son
                 relations.groupBy(
                     keySelector = { it.reveil_id },
                     valueTransform = {
@@ -88,6 +108,7 @@ class ReveilRepository {
 
     }
 
+    // Récupérer le son attribué à un membre pour un réveil
     suspend fun recupererSonPourReveil(reveilId: String, membreId: String): MembreReveilInfo? {
         return withContext(Dispatchers.IO) {
             try {
@@ -115,6 +136,7 @@ class ReveilRepository {
         }
     }
 
+    // Ajouter un nouveau réveil
     suspend fun ajouterReveil(userId: String, nom: String, heure: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -134,6 +156,7 @@ class ReveilRepository {
         }
     }
 
+    // Mettre à jour le nom et l'heure d'un réveil
     suspend fun mettreAJourInfosReveil(id: String, nom: String, heure: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -148,6 +171,7 @@ class ReveilRepository {
         }
     }
 
+    // Activer ou désactiver un réveil
     suspend fun mettreAJourEtatReveil(id: String, actif: Boolean): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -162,6 +186,7 @@ class ReveilRepository {
         }
     }
 
+    // Supprimer un réveil
     suspend fun supprimerReveil(id: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -173,6 +198,11 @@ class ReveilRepository {
         }
     }
 
+    // ==========================================
+    // GESTION DES MEMBRES ET DES SONS
+    // ==========================================
+
+    // Ajouter ou retirer un contact d'un réveil
     suspend fun basculerMembre(idReveil: String, idContact: String, associe: Boolean): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -193,6 +223,7 @@ class ReveilRepository {
         }
     }
 
+    // Attribuer un son à un membre du réveil
     suspend fun assignerSonMembre(idReveil: String, idContact: String, idSon: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -210,6 +241,7 @@ class ReveilRepository {
         }
     }
 
+    // Attribuer un son au créateur du réveil
     suspend fun assignerSonCreateur(idReveil: String, idSon: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -224,6 +256,7 @@ class ReveilRepository {
         }
     }
 
+    // Récupérer plusieurs sons à partir de leurs identifiants
     suspend fun recupererSonsParIds(sonIds: List< String >): Map< String, Son > {
         return withContext(Dispatchers.IO) {
             if (sonIds.isEmpty()) return@withContext emptyMap()
@@ -238,6 +271,7 @@ class ReveilRepository {
         }
     }
 
+    // Récupérer plusieurs utilisateurs à partir de leurs identifiants
     suspend fun recupererUtilisateursParIds(userIds: List< String >): Map< String, Utilisateur > {
         return withContext(Dispatchers.IO) {
             if (userIds.isEmpty()) return@withContext emptyMap()

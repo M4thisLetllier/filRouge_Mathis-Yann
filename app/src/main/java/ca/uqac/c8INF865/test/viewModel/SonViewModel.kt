@@ -11,19 +11,25 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+// --------------------------------------------------------
+// VIEWMODEL DES SONS
+// --------------------------------------------------------
+
 class SonViewModel : ViewModel() {
     private val repository = SonRepository()
 
+    // Liste des sons appartenant à l'utilisateur connecté
     private val _sons = MutableStateFlow<List<Son>>(emptyList())
     val sons: StateFlow<List<Son>> = _sons.asStateFlow()
 
+    // Charger les sons au démarrage
     init {
         chargerSons()
     }
 
+    // Récupérer les sons de l'utilisateur connecté
     private fun chargerSons() {
         viewModelScope.launch {
-            // On récupère l'ID du vrai utilisateur connecté
             val userId = Supabase.client.auth.currentUserOrNull()?.id ?: return@launch
 
             val liste = repository.recupererSons(userId)
@@ -31,36 +37,34 @@ class SonViewModel : ViewModel() {
         }
     }
 
+    // Importer un nouveau son
     fun uploaderSon(nom: String, cheminLocal: String) {
         viewModelScope.launch {
-            // On récupère l'ID du vrai utilisateur connecté
             val userId = Supabase.client.auth.currentUserOrNull()?.id ?: return@launch
 
             val succes = repository.uploaderSon(userId, nom, cheminLocal)
             if (succes) {
-                chargerSons() // Rafraîchit la liste si l'upload a fonctionné
-            }
-        }
-    }
-
-    fun supprimer(son: Son) {
-        viewModelScope.launch {
-            // Appel au repository pour supprimer le fichier et la donnée
-            val succes = repository.supprimerSon(son)
-
-            if (succes) {
-                // Rafraîchir la liste après la suppression
-                // (Remplacez chargerSons() par le nom exact de votre fonction de rechargement)
                 chargerSons()
             }
         }
     }
 
+    // Supprimer un son
+    fun supprimer(son: Son) {
+        viewModelScope.launch {
+            val succes = repository.supprimerSon(son)
+
+            if (succes) {
+                chargerSons()
+            }
+        }
+    }
+
+    // Renommer un son
     fun renommerSon(son: Son, nouveauNom: String) {
         viewModelScope.launch {
             val succes = repository.modifierNomSon(son.id, nouveauNom)
             if (succes) {
-                // Remplacez 'chargerSons()' par le nom de votre fonction qui récupère la liste
                 chargerSons()
             }
         }

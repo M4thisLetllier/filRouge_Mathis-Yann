@@ -9,36 +9,49 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+// --------------------------------------------------------
+// VIEWMODEL D'AUTHENTIFICATION ET DE PROFIL
+// --------------------------------------------------------
+
 class AuthViewModel : ViewModel() {
     private val repository = AuthRepository()
 
+    // État de l'inscription ou de la connexion
     private val _chargement = MutableStateFlow(false)
     val chargement: StateFlow<Boolean> = _chargement.asStateFlow()
 
+    // Message d'erreur lié à l'authentification
     private val _erreur = MutableStateFlow<String?>(null)
     val erreur: StateFlow<String?> = _erreur.asStateFlow()
 
+    // Indique si un utilisateur est connecté
     private val _connecte = MutableStateFlow(repository.recupererIdUtilisateurCourant() != null)
     val connecte: StateFlow<Boolean> = _connecte.asStateFlow()
 
+    // Profil de l'utilisateur connecté
     private val _profil = MutableStateFlow<Utilisateur?>(null)
     val profil: StateFlow<Utilisateur?> = _profil.asStateFlow()
 
+    // État du chargement du profil
     private val _chargementProfil = MutableStateFlow(false)
     val chargementProfil: StateFlow<Boolean> = _chargementProfil.asStateFlow()
 
+    // État de la sauvegarde du profil
     private val _sauvegardeProfil = MutableStateFlow(false)
     val sauvegardeProfil: StateFlow<Boolean> = _sauvegardeProfil.asStateFlow()
 
+    // Message d'erreur lié au profil
     private val _erreurProfil = MutableStateFlow<String?>(null)
     val erreurProfil: StateFlow<String?> = _erreurProfil.asStateFlow()
 
+    // Charger automatiquement le profil si une session existe déjà
     init {
         if (_connecte.value) {
             recupererProfil()
         }
     }
 
+    // Inscrire un nouvel utilisateur
     fun inscription(email: String, motDePasse: String, nom: String, telephone: String) {
         viewModelScope.launch {
             _chargement.value = true
@@ -54,6 +67,7 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    // Connecter un utilisateur existant
     fun connexion(email: String, motDePasse: String) {
         viewModelScope.launch {
             _chargement.value = true
@@ -69,6 +83,7 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    // Récupérer le profil de l'utilisateur connecté
     fun recupererProfil() {
         viewModelScope.launch {
             _chargementProfil.value = true
@@ -81,6 +96,7 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    // Modifier les informations du profil
     fun mettreAJourProfil(nom: String, telephone: String, onSucces: () -> Unit) {
         viewModelScope.launch {
             _sauvegardeProfil.value = true
@@ -96,6 +112,7 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    // Déconnecter l'utilisateur courant
     fun deconnexion(onTerminee: () -> Unit) {
         viewModelScope.launch {
             repository.deconnexion()

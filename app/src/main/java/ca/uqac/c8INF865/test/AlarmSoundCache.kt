@@ -5,6 +5,7 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
+// Gestionnaire de stockage local qui télécharge et conserve les fichiers audio Supabase pour garantir que l'alarme sonne même sans connexion Internet.
 object AlarmSoundCache {
     private const val DIRECTORY = "alarm_sounds"
 

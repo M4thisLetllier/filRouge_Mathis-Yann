@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 
+// BroadcastReceiver capturant le signal de l'AlarmManager d'Android à l'heure programmée pour déclencher l'alarme.
 class AlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {

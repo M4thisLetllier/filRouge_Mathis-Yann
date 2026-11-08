@@ -9,5 +9,5 @@ data class Reveil(
     val nom: String,
     val heure: String,
     val actif: Boolean = true,
-    val son_id: String? = null // NOUVEAU CHAMP
+    val son_id: String? = null
 )

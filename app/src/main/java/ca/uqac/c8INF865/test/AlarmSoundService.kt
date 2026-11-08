@@ -12,6 +12,7 @@ import android.media.RingtoneManager
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 
+// Service Android qui joue le son de l'alarme en boucle et affiche une notification persistante pour permettre à l'utilisateur de désactiver l'alarme.
 class AlarmSoundService : Service() {
     private var mediaPlayer: MediaPlayer? = null
 

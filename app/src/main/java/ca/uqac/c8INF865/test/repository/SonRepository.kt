@@ -8,15 +8,22 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
+// --------------------------------------------------------
+// REPOSITORY
+// --------------------------------------------------------
+
 class SonRepository {
     private val db = Supabase.client.postgrest
     private val storage = Supabase.client.storage
 
-    // Fonction suspendue : elle s'exécute en arrière-plan sans bloquer l'application
+    // ==========================================
+    // GESTION DES SONS
+    // ==========================================
+
+    // Récupérer les sons appartenant à l'utilisateur
     suspend fun recupererSons(userId: String): List<Son> {
         return withContext(Dispatchers.IO) {
             try {
-                // Requête SQL vers Supabase
                 db.from("sons").select {
                     filter { eq("utilisateur_id", userId) }
                 }.decodeList<Son>()
@@ -26,21 +33,21 @@ class SonRepository {
         }
     }
 
-    // Exemple d'implémentation pour SonRepository
+    // Importer un fichier audio dans le Storage et l'enregistrer en base de données
     suspend fun uploaderSon(userId: String, nom: String, cheminLocal: String): Boolean {
         return try {
             val fichier = java.io.File(cheminLocal)
             val extension = fichier.extension
             val nomFichierUnique = "${userId}_${System.currentTimeMillis()}.$extension"
 
-            // 1. Upload dans le Storage
+            // Upload dans le Storage
             val bucket = Supabase.client.storage.from("sons")
             bucket.upload(nomFichierUnique, fichier.readBytes())
 
-            // 2. Récupération de l'URL publique
+            // Récupération de l'URL publique
             val urlPublique = bucket.publicUrl(nomFichierUnique)
 
-            // 3. Sauvegarde dans la table SQL 'sons'
+            // Sauvegarde dans la table SQL 'sons'
             val nouveauSon = Son(
                 id = java.util.UUID.randomUUID().toString(),
                 utilisateur_id = userId,
@@ -56,6 +63,7 @@ class SonRepository {
         }
     }
 
+    // Modifier le nom d'un son
     suspend fun modifierNomSon(sonId: String, nouveauNom: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -74,18 +82,18 @@ class SonRepository {
         }
     }
 
+    // Supprimer un son du Storage et de la base de données
     suspend fun supprimerSon(son: Son): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                // 1. Extraire le nom du fichier à partir de l'URL publique
-                // (ex: https://.../sons/123_456.3gp -> "123_456.3gp")
+                // Extraire le nom du fichier à partir de l'URL publique
                 val nomFichier = son.url.substringAfterLast("/")
 
-                // 2. Supprimer le fichier du Storage de Supabase
+                // Supprimer le fichier du Storage de Supabase
                 val bucket = Supabase.client.storage.from("sons")
                 bucket.delete(nomFichier) // delete prend une liste ou un vararg de noms de fichiers
 
-                // 3. Supprimer l'entrée dans la base de données SQL
+                // Supprimer l'entrée dans la base de données SQL
                 db.from("sons").delete {
                     filter { eq("id", son.id) }
                 }

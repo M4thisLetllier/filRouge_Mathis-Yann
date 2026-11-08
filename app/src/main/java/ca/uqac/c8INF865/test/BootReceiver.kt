@@ -4,8 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import ca.uqac.c8INF865.test.ui.screens.programmerAlarmeReveil
-// N'oubliez pas d'importer votre modèle Reveil depuis Supabase si nécessaire
-// import ca.uqac.c8INF865.test.data.Reveil
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
