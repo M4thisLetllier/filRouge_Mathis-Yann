@@ -26,6 +26,9 @@ data class AccueilUiState(
 class ReveilViewModel : ViewModel() {
     private val repository = ReveilRepository()
 
+    private val _currentUserId = MutableStateFlow(Supabase.client.auth.currentUserOrNull()?.id)
+    val currentUserId: StateFlow<String?> = _currentUserId.asStateFlow()
+
     // État global des réveils affichés
     private val _uiState = MutableStateFlow(AccueilUiState())
     val uiState: StateFlow< AccueilUiState > = _uiState.asStateFlow()

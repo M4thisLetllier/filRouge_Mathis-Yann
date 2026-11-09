@@ -38,7 +38,6 @@ fun EcranContact(
     val texteRecherche = contactViewModel.recherche.trim()
     val demandes by contactViewModel.demandes.collectAsState()
 
-    // NOUVEAU : Gestion du Pager (Swipe)
     val pagerState = rememberPagerState(pageCount = { 2 })
     val coroutineScope = rememberCoroutineScope()
 
@@ -233,7 +232,7 @@ fun DemandeCard(contact: Utilisateur, onAccepter: () -> Unit, onRefuser: () -> U
     }
 }
 
-// Carte de contact inchangée
+// Carte de contact
 @Composable
 fun ContactCard(contact: Utilisateur, onSupprimer: () -> Unit = {}) {
     var afficherConfirmation by remember { mutableStateOf(false) }
@@ -303,7 +302,6 @@ fun ContactCard(contact: Utilisateur, onSupprimer: () -> Unit = {}) {
     }
 }
 
-// Formulaire légèrement adapté pour le texte
 @Composable
 private fun FormulaireContact(
     erreur: String?,

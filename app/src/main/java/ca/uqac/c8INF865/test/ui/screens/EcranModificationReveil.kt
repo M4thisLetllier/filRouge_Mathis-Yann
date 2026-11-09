@@ -17,11 +17,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ca.uqac.c8INF865.test.data.Reveil
-import ca.uqac.c8INF865.test.network.Supabase
 import ca.uqac.c8INF865.test.viewModel.ContactViewModel
 import ca.uqac.c8INF865.test.viewModel.ReveilViewModel
 import ca.uqac.c8INF865.test.viewModel.SonViewModel
-import io.github.jan.supabase.gotrue.auth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,7 +31,8 @@ fun EcranModificationReveil(
     sonViewModel: SonViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val currentUserId = Supabase.client.auth.currentUserOrNull()?.id ?: ""
+    val currentUserId by reveilViewModel.currentUserId.collectAsState()
+    val currentUserIdValue = currentUserId ?: ""
 
     // États provenant des ViewModels
     val uiState by reveilViewModel.uiState.collectAsState()
@@ -48,7 +47,7 @@ fun EcranModificationReveil(
     val reveilActuel = uiState.listeReveils.find { it.id == reveil.id } ?: reveil
 
     // Vérifie si l'utilisateur connecté est le créateur
-    val estCreateur = estNouveau || reveilActuel.createur_id == currentUserId
+    val estCreateur = estNouveau || reveilActuel.createur_id == currentUserIdValue
 
     // Couleur dominante : Primaire si créateur, Vert si invité
     val couleurDominante = if (estCreateur) MaterialTheme.colorScheme.primary else Color(0xFF2E7D32)
@@ -137,7 +136,7 @@ fun EcranModificationReveil(
                             val monSonId = if (estCreateur) {
                                 reveilActuel.son_id
                             } else {
-                                contactsAssociesDonnees.find { it.membreId == currentUserId }?.sonId
+                                contactsAssociesDonnees.find { it.membreId == currentUserIdValue }?.sonId
                             }
                             val monSon = monSonId?.let { sonsAssignes[it] }
 
@@ -252,7 +251,7 @@ fun EcranModificationReveil(
                     contactsAssociesDonnees.forEach { donneeRelation ->
                         val membreId = donneeRelation.membreId
                         val utilisateurMembre = utilisateursConnus[membreId] ?: contacts.find { it.id == membreId }
-                        val nomMembre = if (membreId == currentUserId) {
+                        val nomMembre = if (membreId == currentUserIdValue) {
                             "${utilisateurMembre?.nom ?: "Moi"} (Vous)"
                         } else {
                             utilisateurMembre?.nom ?: "Membre"
@@ -307,9 +306,9 @@ fun EcranModificationReveil(
                             }
 
                             // Seul le créateur peut retirer un membre (ou un membre peut se retirer lui-même)
-                            if (estCreateur || membreId == currentUserId) {
+                            if (estCreateur || membreId == currentUserIdValue) {
                                 TextButton(onClick = { reveilViewModel.basculerContact(reveilActuel.id, membreId, false) }) {
-                                    Text(if (membreId == currentUserId) "Quitter" else "Retirer", color = MaterialTheme.colorScheme.error)
+                                    Text(if (membreId == currentUserIdValue) "Quitter" else "Retirer", color = MaterialTheme.colorScheme.error)
                                 }
                             }
                         }

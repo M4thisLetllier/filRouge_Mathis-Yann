@@ -48,9 +48,7 @@ import ca.uqac.c8INF865.test.data.Reveil
 import ca.uqac.c8INF865.test.data.Utilisateur
 import ca.uqac.c8INF865.test.viewModel.ContactViewModel
 import ca.uqac.c8INF865.test.viewModel.ReveilViewModel
-import ca.uqac.c8INF865.test.network.Supabase
 import ca.uqac.c8INF865.test.repository.ReveilRepository
-import io.github.jan.supabase.gotrue.auth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -77,7 +75,7 @@ private fun alarmPendingIntent(context: Context, reveilId: String, sonId: String
     val intent = Intent(context, AlarmReceiver::class.java).apply {
         putExtra("REVEIL_ID", reveilId)
         if (sonId != null) {
-            putExtra("SON_ID", sonId) // Correspond exactement à ce qu'attend AlarmReceiver !
+            putExtra("SON_ID", sonId)
         }
     }
     return PendingIntent.getBroadcast(
@@ -139,7 +137,7 @@ fun EcranAccueilReveil(
     val context = LocalContext.current
     val reveils by reveilViewModel.uiState.collectAsState()
     val contactsParReveil by reveilViewModel.contactsParReveil.collectAsState()
-    val currentUserId = Supabase.client.auth.currentUserOrNull()?.id
+    val currentUserId by reveilViewModel.currentUserId.collectAsState()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -226,6 +224,7 @@ fun EcranAccueilReveil(
                 items(reveils.listeReveils) { reveil ->
                     CarteReveil(
                         reveil = reveil,
+                        currentUserId = currentUserId,
                         contactsAssocies = contactsParReveil[reveil.id].orEmpty().map { it.membreId }.toSet(),
                         onClick = { onModifierReveil(reveil) },
                         onEtatChange = { actif ->
@@ -262,6 +261,7 @@ fun EcranAccueilReveil(
 @Composable
 fun CarteReveil(
     reveil: Reveil,
+    currentUserId: String?,
     contactsAssocies: Set<String> = emptySet(),
     onClick: () -> Unit,
     onEtatChange: (Boolean) -> Unit = {}
@@ -270,7 +270,6 @@ fun CarteReveil(
     val nombreAmis = contactsAssocies.size
 
     // Détection du créateur
-    val currentUserId = Supabase.client.auth.currentUserOrNull()?.id
     val estCreateur = reveil.createur_id == currentUserId || reveil.createur_id.isEmpty()
 
     val couleurDominante = if (estCreateur) MaterialTheme.colorScheme.primary else Color(0xFF2E7D32)

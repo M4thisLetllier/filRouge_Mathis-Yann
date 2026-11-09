@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.media.MediaPlayer
 import android.media.MediaRecorder
+import android.os.Build
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -22,9 +24,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ca.uqac.c8INF865.test.data.Son
 import ca.uqac.c8INF865.test.viewModel.SonViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
@@ -33,20 +37,21 @@ import java.util.Locale
 
 @Composable
 fun EcranSons(
-    sonViewModel: SonViewModel = viewModel() // Instanciation autonome
+    sonViewModel: SonViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val sons by sonViewModel.sons.collectAsState()
 
-    // NOUVEAU : Gestion du Pager (Swipe)
+    // Gestion du Pager (Swipe)
     val pagerState = rememberPagerState(pageCount = { 2 })
     val coroutineScope = rememberCoroutineScope()
 
+    // États d'enregistrement
     var enregistrement by remember { mutableStateOf(false) }
     var fichierTemporaire by remember { mutableStateOf<File?>(null) }
     var permissionAccordee by remember {
         mutableStateOf(
-            androidx.core.content.ContextCompat.checkSelfPermission(
+            ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.RECORD_AUDIO
             ) == PackageManager.PERMISSION_GRANTED
@@ -58,31 +63,46 @@ fun EcranSons(
     var secondes by remember { mutableIntStateOf(0) }
     var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
 
-    LaunchedEffect(enregistrement) {
-        if (enregistrement) {
-            secondes = 0
-            while (enregistrement) {
-                kotlinx.coroutines.delay(1_000)
-                secondes++
-            }
-        }
-    }
+    // Instance unique de MediaPlayer pour toute la liste
+    val lecteur = remember { MediaPlayer() }
+    var sonEnCoursId by remember { mutableStateOf<String?>(null) }
+    var estEnTrainDeJouer by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         onDispose {
             recorder?.runCatching { stop() }
             recorder?.release()
+            lecteur.release()
         }
     }
 
-    fun commencer() {
+    LaunchedEffect(enregistrement) {
+        if (enregistrement) {
+            secondes = 0
+            while (enregistrement) {
+                delay(1_000)
+                secondes++
+            }
+        }
+    }
+
+    fun commencerEnregistrement() {
         if (!permissionAccordee) {
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             return
         }
+
+        // Arrêter la lecture en cours si un son est en train de jouer
+        if (estEnTrainDeJouer) {
+            lecteur.stop()
+            lecteur.reset()
+            sonEnCoursId = null
+            estEnTrainDeJouer = false
+        }
+
         val dossier = File(context.filesDir, "sons").apply { mkdirs() }
         val fichier = File(dossier, "son_${System.currentTimeMillis()}.3gp")
-        val nouveauRecorder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+        val nouveauRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             MediaRecorder(context)
         } else {
             @Suppress("DEPRECATION")
@@ -92,19 +112,67 @@ fun EcranSons(
             setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP)
             setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
             setOutputFile(fichier.absolutePath)
-            prepare()
-            start()
         }
-        fichierTemporaire = fichier
-        recorder = nouveauRecorder
-        enregistrement = true
+
+        runCatching {
+            nouveauRecorder.prepare()
+            nouveauRecorder.start()
+            fichierTemporaire = fichier
+            recorder = nouveauRecorder
+            enregistrement = true
+        }.onFailure { e ->
+            Log.e("EcranSons", "Erreur lors du démarrage de l'enregistrement", e)
+            nouveauRecorder.release()
+        }
     }
 
-    fun arreter() {
+    fun arreterEnregistrement() {
         recorder?.runCatching { stop() }
         recorder?.release()
         recorder = null
         enregistrement = false
+    }
+
+    fun jouerOuPauser(son: Son) {
+        if (sonEnCoursId == son.id) {
+            if (lecteur.isPlaying) {
+                lecteur.pause()
+                estEnTrainDeJouer = false
+            } else {
+                lecteur.start()
+                estEnTrainDeJouer = true
+            }
+        } else {
+            lecteur.reset()
+            runCatching {
+                lecteur.setDataSource(son.url)
+                lecteur.setOnCompletionListener {
+                    sonEnCoursId = null
+                    estEnTrainDeJouer = false
+                }
+                lecteur.setOnPreparedListener { mp ->
+                    mp.start()
+                    sonEnCoursId = son.id
+                    estEnTrainDeJouer = true
+                }
+                lecteur.prepareAsync()
+            }.onFailure { e ->
+                Log.e("EcranSons", "Erreur lors de la lecture du son", e)
+                lecteur.reset()
+                sonEnCoursId = null
+                estEnTrainDeJouer = false
+            }
+        }
+    }
+
+    fun supprimerSon(son: Son) {
+        if (sonEnCoursId == son.id) {
+            lecteur.stop()
+            lecteur.reset()
+            sonEnCoursId = null
+            estEnTrainDeJouer = false
+        }
+        sonViewModel.supprimer(son)
     }
 
     Scaffold { padding ->
@@ -132,22 +200,22 @@ fun EcranSons(
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
-                userScrollEnabled = !enregistrement // Bloque le swipe pendant l'enregistrement
+                userScrollEnabled = !enregistrement
             ) { page ->
                 if (page == 0) {
                     Enregistreur(
                         enregistrement = enregistrement,
                         secondes = secondes,
                         fichierPret = fichierTemporaire != null && !enregistrement,
-                        onCommencer = ::commencer,
-                        onArreter = ::arreter,
+                        onCommencer = ::commencerEnregistrement,
+                        onArreter = ::arreterEnregistrement,
                         onRefaire = {
                             fichierTemporaire?.delete()
                             fichierTemporaire = null
                         },
                         onSauvegarder = {
                             fichierTemporaire?.let { fichier ->
-                                // Envoi vers Firebase Storage
+                                // Envoi vers Supabase Storage
                                 sonViewModel.uploaderSon(
                                     nom = "Enregistrement " + SimpleDateFormat(
                                         "dd/MM/yyyy HH:mm",
@@ -157,14 +225,20 @@ fun EcranSons(
                                 )
                             }
                             fichierTemporaire = null
-                            // On bascule automatiquement sur la page "Mes sons" après sauvegarde
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(1)
                             }
                         }
                     )
                 } else {
-                    ListeSons(sons, sonViewModel::supprimer, onRenommer = sonViewModel::renommerSon)
+                    ListeSons(
+                        sons = sons,
+                        sonEnCoursId = sonEnCoursId,
+                        estEnTrainDeJouer = estEnTrainDeJouer,
+                        onToggleLecture = ::jouerOuPauser,
+                        onSupprimer = ::supprimerSon,
+                        onRenommer = sonViewModel::renommerSon
+                    )
                 }
             }
         }
@@ -230,6 +304,9 @@ private fun Enregistreur(
 @Composable
 private fun ListeSons(
     sons: List<Son>,
+    sonEnCoursId: String?,
+    estEnTrainDeJouer: Boolean,
+    onToggleLecture: (Son) -> Unit,
     onSupprimer: (Son) -> Unit,
     onRenommer: (Son, String) -> Unit
 ) {
@@ -247,6 +324,8 @@ private fun ListeSons(
         items(sons, key = { it.id }) { son ->
             CarteSon(
                 son = son,
+                estEnCoursDeLecture = son.id == sonEnCoursId && estEnTrainDeJouer,
+                onToggleLecture = { onToggleLecture(son) },
                 onSupprimer = onSupprimer,
                 onRenommer = onRenommer
             )
@@ -257,25 +336,14 @@ private fun ListeSons(
 @Composable
 private fun CarteSon(
     son: Son,
+    estEnCoursDeLecture: Boolean,
+    onToggleLecture: () -> Unit,
     onSupprimer: (Son) -> Unit,
     onRenommer: (Son, String) -> Unit
 ) {
-    var lecture by remember(son.url) { mutableStateOf(false) }
     var afficherConfirmationSuppression by remember { mutableStateOf(false) }
     var afficherBoiteRenommer by remember { mutableStateOf(false) }
     var nouveauNom by remember { mutableStateOf(son.nom) }
-
-    val lecteur = remember(son.url) {
-        MediaPlayer().apply {
-            setDataSource(son.url)
-            prepareAsync()
-            setOnCompletionListener { lecture = false }
-        }
-    }
-
-    DisposableEffect(lecteur) {
-        onDispose { lecteur.release() }
-    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -287,13 +355,10 @@ private fun CarteSon(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = {
-                if (lecture) lecteur.pause() else lecteur.start()
-                lecture = !lecture
-            }) {
+            IconButton(onClick = onToggleLecture) {
                 Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = if (lecture) "Mettre en pause" else "Écouter"
+                    imageVector = if (estEnCoursDeLecture) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (estEnCoursDeLecture) "Mettre en pause" else "Écouter"
                 )
             }
 
@@ -353,10 +418,6 @@ private fun CarteSon(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (lecture) {
-                            lecteur.stop()
-                            lecture = false
-                        }
                         afficherConfirmationSuppression = false
                         onSupprimer(son)
                     }
