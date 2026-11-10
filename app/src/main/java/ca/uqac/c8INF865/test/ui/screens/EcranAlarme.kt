@@ -49,7 +49,7 @@ fun EcranAlarme(
             modifier = Modifier.size(64.dp)
         )
         Text(
-            text = "C'est l'heure de votre réveil !",
+            text = "Réveil toi !!",
             style = MaterialTheme.typography.headlineMedium,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(vertical = 32.dp)
