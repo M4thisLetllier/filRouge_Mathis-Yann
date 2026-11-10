@@ -268,7 +268,8 @@ fun EcranModificationReveil(
                 items(contactsAssociesDonnees, key = { it.membreId }) { donneeRelation ->
                     val membreId = donneeRelation.membreId
                     val utilisateurMembre = utilisateursConnus[membreId] ?: contacts.find { it.id == membreId }
-                    val nomMembre = if (membreId == currentUserIdValue) {
+                    val estMoi = membreId == currentUserIdValue
+                    val nomMembre = if (estMoi) {
                         "${utilisateurMembre?.nom ?: "Moi"} (Vous)"
                     } else {
                         utilisateurMembre?.nom ?: "Membre"
@@ -276,6 +277,8 @@ fun EcranModificationReveil(
 
                     val sonMembre = donneeRelation.sonId?.let { sonsAssignes[it] }
                     val auteurSonMembre = sonMembre?.let { utilisateursConnus[it.utilisateur_id]?.nom ?: "Inconnu" }
+
+                    var afficherConfirmationAction by remember { mutableStateOf(false) }
 
                     Row(
                         modifier = Modifier
@@ -325,11 +328,44 @@ fun EcranModificationReveil(
                             }
                         }
 
-                        if (estCreateur || membreId == currentUserIdValue) {
-                            TextButton(onClick = { reveilViewModel.basculerContact(reveilActuel.id, membreId, false) }) {
-                                Text(if (membreId == currentUserIdValue) "Quitter" else "Retirer", color = MaterialTheme.colorScheme.error)
+                        if (estCreateur || estMoi) {
+                            TextButton(onClick = { afficherConfirmationAction = true }) {
+                                Text(if (estMoi) "Quitter" else "Retirer", color = MaterialTheme.colorScheme.error)
                             }
                         }
+                    }
+
+                    // Boîte de dialogue de confirmation pour Quitter / Retirer
+                    if (afficherConfirmationAction) {
+                        AlertDialog(
+                            onDismissRequest = { afficherConfirmationAction = false },
+                            title = {
+                                Text(if (estMoi) "Quitter ce réveil ?" else "Retirer ce membre ?")
+                            },
+                            text = {
+                                Text(
+                                    if (estMoi)
+                                        "Voulez-vous vraiment vous retirer de ce réveil partagé ?"
+                                    else
+                                        "Voulez-vous vraiment retirer ${utilisateurMembre?.nom ?: "ce membre"} de ce réveil ?"
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        afficherConfirmationAction = false
+                                        reveilViewModel.basculerContact(reveilActuel.id, membreId, false)
+                                    }
+                                ) {
+                                    Text(if (estMoi) "Quitter" else "Retirer", color = MaterialTheme.colorScheme.error)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { afficherConfirmationAction = false }) {
+                                    Text("Annuler")
+                                }
+                            }
+                        )
                     }
                 }
 
