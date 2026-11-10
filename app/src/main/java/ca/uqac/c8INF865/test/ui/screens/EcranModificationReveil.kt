@@ -2,6 +2,8 @@ package ca.uqac.c8INF865.test.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -43,7 +45,6 @@ fun EcranModificationReveil(
     val mesSons by sonViewModel.sons.collectAsState()
 
     val estNouveau = reveil.id.isEmpty()
-    // On observe le réveil en direct depuis le ViewModel pour voir les mises à jour de son_id instantanément
     val reveilActuel = uiState.listeReveils.find { it.id == reveil.id } ?: reveil
 
     // Vérifie si l'utilisateur connecté est le créateur
@@ -82,216 +83,234 @@ fun EcranModificationReveil(
             )
         }
     ) { paddingValues ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp)
+                .padding(paddingValues),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Détails du réveil", fontWeight = FontWeight.Bold, color = couleurDominante)
-            Spacer(modifier = Modifier.height(8.dp))
+            // ==========================================
+            // SECTION : FORMULAIRE PRINCIPAL
+            // ==========================================
+            item {
+                Text("Détails du réveil", fontWeight = FontWeight.Bold, color = couleurDominante)
+                Spacer(modifier = Modifier.height(8.dp))
 
-            OutlinedTextField(
-                value = nom,
-                onValueChange = { nom = it },
-                label = { Text("Nom") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = couleurDominante,
-                    focusedLabelColor = couleurDominante
+                OutlinedTextField(
+                    value = nom,
+                    onValueChange = { nom = it },
+                    label = { Text("Nom") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = couleurDominante,
+                        focusedLabelColor = couleurDominante
+                    )
                 )
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            var afficherSelectionHeure by remember { mutableStateOf(false) }
-            OutlinedButton(
-                onClick = { afficherSelectionHeure = true },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = couleurDominante),
-                border = BorderStroke(1.dp, couleurDominante)
-            ) {
-                Text("Sélectionner l'heure : $heure")
-            }
+                var afficherSelectionHeure by remember { mutableStateOf(false) }
+                OutlinedButton(
+                    onClick = { afficherSelectionHeure = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = couleurDominante),
+                    border = BorderStroke(1.dp, couleurDominante)
+                ) {
+                    Text("Sélectionner l'heure : $heure")
+                }
 
-            if (afficherSelectionHeure) {
-                SelecteurHeure(
-                    heureInitiale = heure,
-                    onDismiss = { afficherSelectionHeure = false },
-                    onConfirm = {
-                        heure = it
-                        afficherSelectionHeure = false
-                    }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = {
-                    if (estNouveau) {
-                        reveilViewModel.ajouterReveil(nom, heure)
-                    } else {
-                        reveilViewModel.modifierReveil(reveilActuel.id, nom, heure)
-                        if (reveilActuel.actif) {
-                            val monSonId = if (estCreateur) {
-                                reveilActuel.son_id
-                            } else {
-                                contactsAssociesDonnees.find { it.membreId == currentUserIdValue }?.sonId
-                            }
-                            val monSon = monSonId?.let { sonsAssignes[it] }
-
-                            programmerAlarmeReveil(
-                                context,
-                                reveilActuel.copy(nom = nom, heure = heure),
-                                monSon?.id,
-                                monSon?.url
-                            )
+                if (afficherSelectionHeure) {
+                    SelecteurHeure(
+                        heureInitiale = heure,
+                        onDismiss = { afficherSelectionHeure = false },
+                        onConfirm = {
+                            heure = it
+                            afficherSelectionHeure = false
                         }
-                    }
-                    onRetour()
-                },
-                enabled = nom.isNotBlank(),
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = couleurDominante)
-            ) {
-                Text(if (estNouveau) "Créer le réveil" else "Enregistrer les changements")
-            }
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        if (estNouveau) {
+                            reveilViewModel.ajouterReveil(nom, heure)
+                        } else {
+                            reveilViewModel.modifierReveil(reveilActuel.id, nom, heure)
+                            if (reveilActuel.actif) {
+                                val monSonId = if (estCreateur) {
+                                    reveilActuel.son_id
+                                } else {
+                                    contactsAssociesDonnees.find { it.membreId == currentUserIdValue }?.sonId
+                                }
+                                val monSon = monSonId?.let { sonsAssignes[it] }
+
+                                programmerAlarmeReveil(
+                                    context,
+                                    reveilActuel.copy(nom = nom, heure = heure),
+                                    monSon?.id,
+                                    monSon?.url
+                                )
+                            }
+                        }
+                        onRetour()
+                    },
+                    enabled = nom.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = couleurDominante)
+                ) {
+                    Text(if (estNouveau) "Créer le réveil" else "Enregistrer les changements")
+                }
+            }
 
             if (estNouveau) {
-                Text("Membres", fontWeight = FontWeight.Bold, color = couleurDominante)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "Veuillez d'abord créer et enregistrer ce réveil pour pouvoir y inviter des membres.",
-                    color = Color.Gray,
-                    fontSize = 14.sp
-                )
+                item {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Membres", fontWeight = FontWeight.Bold, color = couleurDominante)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Veuillez d'abord créer et enregistrer ce réveil pour pouvoir y inviter des membres.",
+                        color = Color.Gray,
+                        fontSize = 14.sp
+                    )
+                }
             } else {
                 // ==========================================
                 // SECTION : CRÉATEUR DU RÉVEIL
                 // ==========================================
-                Text("Créateur du réveil", fontWeight = FontWeight.Bold, color = couleurDominante)
-                Spacer(modifier = Modifier.height(4.dp))
+                item {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Créateur du réveil", fontWeight = FontWeight.Bold, color = couleurDominante)
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                val createurUser = utilisateursConnus[reveilActuel.createur_id]
-                val nomCreateur = if (estCreateur) "${createurUser?.nom ?: "Moi"} (Vous)" else (createurUser?.nom ?: "Créateur")
+                    val createurUser = utilisateursConnus[reveilActuel.createur_id]
+                    val nomCreateur = if (estCreateur) "${createurUser?.nom ?: "Moi"} (Vous)" else (createurUser?.nom ?: "Créateur")
 
-                val sonCreateur = reveilActuel.son_id?.let { sonsAssignes[it] }
-                val auteurSonCreateur = sonCreateur?.let { utilisateursConnus[it.utilisateur_id]?.nom ?: "Inconnu" }
+                    val sonCreateur = reveilActuel.son_id?.let { sonsAssignes[it] }
+                    val auteurSonCreateur = sonCreateur?.let { utilisateursConnus[it.utilisateur_id]?.nom ?: "Inconnu" }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(nomCreateur, fontWeight = FontWeight.SemiBold)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(nomCreateur, fontWeight = FontWeight.SemiBold)
 
-                        var menuCreateurOuvert by remember { mutableStateOf(false) }
+                            var menuCreateurOuvert by remember { mutableStateOf(false) }
 
-                        if (!estCreateur) {
-                            // Si on n'est PAS le créateur, on peut lui attribuer un son
-                            Box {
-                                TextButton(
-                                    onClick = { menuCreateurOuvert = true },
-                                    contentPadding = PaddingValues(0.dp),
-                                    colors = ButtonDefaults.textButtonColors(contentColor = couleurDominante)
-                                ) {
-                                    val texteSon = if (sonCreateur != null) {
-                                        "Son : ${sonCreateur.nom} (ajouté par $auteurSonCreateur)"
-                                    } else {
-                                        "Attribuer un son..."
-                                    }
-                                    Text(text = texteSon, fontSize = 12.sp)
-                                }
-                                DropdownMenu(
-                                    expanded = menuCreateurOuvert,
-                                    onDismissRequest = { menuCreateurOuvert = false }
-                                ) {
-                                    if (mesSons.isEmpty()) {
-                                        DropdownMenuItem(
-                                            text = { Text("Aucun son disponible") },
-                                            onClick = { menuCreateurOuvert = false }
-                                        )
-                                    }
-                                    mesSons.forEach { son ->
-                                        DropdownMenuItem(
-                                            text = { Text(son.nom) },
-                                            onClick = {
-                                                menuCreateurOuvert = false
-                                                reveilViewModel.assignerSonCreateur(reveilActuel.id, son.id)
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            // Si on EST le créateur, on voit qui nous a ajouté un son
-                            val texteSon = if (sonCreateur != null) {
-                                "Son : ${sonCreateur.nom} (ajouté par $auteurSonCreateur)"
-                            } else {
-                                "Aucun son attribué par les membres"
-                            }
-                            Text(text = texteSon, fontSize = 12.sp, color = Color.Gray)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // ==========================================
-                // SECTION : MEMBRES
-                // ==========================================
-                Text("Membres", fontWeight = FontWeight.Bold, color = couleurDominante)
-                Spacer(modifier = Modifier.height(4.dp))
-
-                if (contactsAssociesDonnees.isEmpty()) {
-                    Text("Aucun membre lié.", color = Color.Gray)
-                } else {
-                    contactsAssociesDonnees.forEach { donneeRelation ->
-                        val membreId = donneeRelation.membreId
-                        val utilisateurMembre = utilisateursConnus[membreId] ?: contacts.find { it.id == membreId }
-                        val nomMembre = if (membreId == currentUserIdValue) {
-                            "${utilisateurMembre?.nom ?: "Moi"} (Vous)"
-                        } else {
-                            utilisateurMembre?.nom ?: "Membre"
-                        }
-
-                        val sonMembre = donneeRelation.sonId?.let { sonsAssignes[it] }
-                        val auteurSonMembre = sonMembre?.let { utilisateursConnus[it.utilisateur_id]?.nom ?: "Inconnu" }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(nomMembre, fontWeight = FontWeight.SemiBold)
-
-                                var menuDeroulantOuvert by remember { mutableStateOf(false) }
-
+                            if (!estCreateur) {
                                 Box {
                                     TextButton(
-                                        onClick = { menuDeroulantOuvert = true },
+                                        onClick = { menuCreateurOuvert = true },
                                         contentPadding = PaddingValues(0.dp),
                                         colors = ButtonDefaults.textButtonColors(contentColor = couleurDominante)
                                     ) {
-                                        val texteSon = if (sonMembre != null) {
-                                            "Son : ${sonMembre.nom} (ajouté par $auteurSonMembre)"
+                                        val texteSon = if (sonCreateur != null) {
+                                            "Son : ${sonCreateur.nom} (ajouté par $auteurSonCreateur)"
                                         } else {
                                             "Attribuer un son..."
                                         }
                                         Text(text = texteSon, fontSize = 12.sp)
                                     }
                                     DropdownMenu(
-                                        expanded = menuDeroulantOuvert,
-                                        onDismissRequest = { menuDeroulantOuvert = false }
+                                        expanded = menuCreateurOuvert,
+                                        onDismissRequest = { menuCreateurOuvert = false }
                                     ) {
                                         if (mesSons.isEmpty()) {
                                             DropdownMenuItem(
                                                 text = { Text("Aucun son disponible") },
-                                                onClick = { menuDeroulantOuvert = false }
+                                                onClick = { menuCreateurOuvert = false }
                                             )
+                                        } else {
+                                            mesSons.forEach { son ->
+                                                DropdownMenuItem(
+                                                    text = { Text(son.nom) },
+                                                    onClick = {
+                                                        menuCreateurOuvert = false
+                                                        reveilViewModel.assignerSonCreateur(reveilActuel.id, son.id)
+                                                    }
+                                                )
+                                            }
                                         }
+                                    }
+                                }
+                            } else {
+                                val texteSon = if (sonCreateur != null) {
+                                    "Son : ${sonCreateur.nom} (ajouté par $auteurSonCreateur)"
+                                } else {
+                                    "Aucun son attribué par les membres"
+                                }
+                                Text(text = texteSon, fontSize = 12.sp, color = Color.Gray)
+                            }
+                        }
+                    }
+                }
+
+                // ==========================================
+                // SECTION : ENTÊTE MEMBRES
+                // ==========================================
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Membres", fontWeight = FontWeight.Bold, color = couleurDominante)
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    if (contactsAssociesDonnees.isEmpty()) {
+                        Text("Aucun membre lié.", color = Color.Gray)
+                    }
+                }
+
+                // ==========================================
+                // LISTE DYNAMIQUE DES MEMBRES
+                // ==========================================
+                items(contactsAssociesDonnees, key = { it.membreId }) { donneeRelation ->
+                    val membreId = donneeRelation.membreId
+                    val utilisateurMembre = utilisateursConnus[membreId] ?: contacts.find { it.id == membreId }
+                    val nomMembre = if (membreId == currentUserIdValue) {
+                        "${utilisateurMembre?.nom ?: "Moi"} (Vous)"
+                    } else {
+                        utilisateurMembre?.nom ?: "Membre"
+                    }
+
+                    val sonMembre = donneeRelation.sonId?.let { sonsAssignes[it] }
+                    val auteurSonMembre = sonMembre?.let { utilisateursConnus[it.utilisateur_id]?.nom ?: "Inconnu" }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(nomMembre, fontWeight = FontWeight.SemiBold)
+
+                            var menuDeroulantOuvert by remember { mutableStateOf(false) }
+
+                            Box {
+                                TextButton(
+                                    onClick = { menuDeroulantOuvert = true },
+                                    contentPadding = PaddingValues(0.dp),
+                                    colors = ButtonDefaults.textButtonColors(contentColor = couleurDominante)
+                                ) {
+                                    val texteSon = if (sonMembre != null) {
+                                        "Son : ${sonMembre.nom} (ajouté par $auteurSonMembre)"
+                                    } else {
+                                        "Attribuer un son..."
+                                    }
+                                    Text(text = texteSon, fontSize = 12.sp)
+                                }
+                                DropdownMenu(
+                                    expanded = menuDeroulantOuvert,
+                                    onDismissRequest = { menuDeroulantOuvert = false }
+                                ) {
+                                    if (mesSons.isEmpty()) {
+                                        DropdownMenuItem(
+                                            text = { Text("Aucun son disponible") },
+                                            onClick = { menuDeroulantOuvert = false }
+                                        )
+                                    } else {
                                         mesSons.forEach { son ->
                                             DropdownMenuItem(
                                                 text = { Text(son.nom) },
@@ -304,78 +323,82 @@ fun EcranModificationReveil(
                                     }
                                 }
                             }
+                        }
 
-                            // Seul le créateur peut retirer un membre (ou un membre peut se retirer lui-même)
-                            if (estCreateur || membreId == currentUserIdValue) {
-                                TextButton(onClick = { reveilViewModel.basculerContact(reveilActuel.id, membreId, false) }) {
-                                    Text(if (membreId == currentUserIdValue) "Quitter" else "Retirer", color = MaterialTheme.colorScheme.error)
-                                }
+                        if (estCreateur || membreId == currentUserIdValue) {
+                            TextButton(onClick = { reveilViewModel.basculerContact(reveilActuel.id, membreId, false) }) {
+                                Text(if (membreId == currentUserIdValue) "Quitter" else "Retirer", color = MaterialTheme.colorScheme.error)
                             }
                         }
                     }
                 }
 
-                // Bouton d'ajout de membre
-                var afficherAjoutContact by remember { mutableStateOf(false) }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { afficherAjoutContact = true },
-                    enabled = contacts.any { it.id !in idsAssocies && it.id != reveilActuel.createur_id },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = couleurDominante),
-                    border = BorderStroke(1.dp, couleurDominante)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Ajouter un membre")
-                }
-
-                if (afficherAjoutContact) {
-                    SelectionContacts(
-                        contacts = contacts.filter { it.id !in idsAssocies && it.id != reveilActuel.createur_id },
-                        onDismiss = { afficherAjoutContact = false },
-                        onConfirm = { ids ->
-                            ids.forEach { reveilViewModel.basculerContact(reveilActuel.id, it, true) }
-                            afficherAjoutContact = false
-                        }
-                    )
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Seul le créateur peut supprimer complètement le réveil
-                if (estCreateur) {
-                    var afficherSuppression by remember { mutableStateOf(false) }
-                    TextButton(
-                        onClick = { afficherSuppression = true },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                // ==========================================
+                // BOUTONS D'ACTION (AJOUTER / SUPPRIMER)
+                // ==========================================
+                item {
+                    var afficherAjoutContact by remember { mutableStateOf(false) }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { afficherAjoutContact = true },
+                        enabled = contacts.any { it.id !in idsAssocies && it.id != reveilActuel.createur_id },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = couleurDominante),
+                        border = BorderStroke(1.dp, couleurDominante)
                     ) {
-                        Icon(Icons.Default.Delete, contentDescription = null)
+                        Icon(Icons.Default.Add, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Supprimer ce réveil")
+                        Text("Ajouter un membre")
                     }
 
-                    if (afficherSuppression) {
-                        AlertDialog(
-                            onDismissRequest = { afficherSuppression = false },
-                            title = { Text("Supprimer le réveil ?") },
-                            text = { Text("Cette action supprimera ce réveil et arrêtera l'alarme associée.") },
-                            confirmButton = {
-                                TextButton(onClick = {
-                                    afficherSuppression = false
-                                    reveilViewModel.supprimerReveil(reveilActuel.id)
-                                    onRetour()
-                                }) {
-                                    Text("Supprimer", color = MaterialTheme.colorScheme.error)
-                                }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = { afficherSuppression = false }) {
-                                    Text("Annuler")
-                                }
+                    if (afficherAjoutContact) {
+                        SelectionContacts(
+                            contacts = contacts.filter { it.id !in idsAssocies && it.id != reveilActuel.createur_id },
+                            onDismiss = { afficherAjoutContact = false },
+                            onConfirm = { ids ->
+                                ids.forEach { reveilViewModel.basculerContact(reveilActuel.id, it, true) }
+                                afficherAjoutContact = false
                             }
                         )
+                    }
+                }
+
+                if (estCreateur) {
+                    item {
+                        var afficherSuppression by remember { mutableStateOf(false) }
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            TextButton(
+                                onClick = { afficherSuppression = true },
+                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Supprimer ce réveil")
+                            }
+                        }
+
+                        if (afficherSuppression) {
+                            AlertDialog(
+                                onDismissRequest = { afficherSuppression = false },
+                                title = { Text("Supprimer le réveil ?") },
+                                text = { Text("Cette action supprimera ce réveil et arrêtera l'alarme associée.") },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        afficherSuppression = false
+                                        reveilViewModel.supprimerReveil(reveilActuel.id)
+                                        onRetour()
+                                    }) {
+                                        Text("Supprimer", color = MaterialTheme.colorScheme.error)
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { afficherSuppression = false }) {
+                                        Text("Annuler")
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }
