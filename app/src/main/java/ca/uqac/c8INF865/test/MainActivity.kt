@@ -18,6 +18,14 @@ import androidx.compose.runtime.setValue
 import ca.uqac.c8INF865.test.ui.screens.EcranAlarme
 import ca.uqac.c8INF865.test.ui.theme.TestTheme
 
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import ca.uqac.c8INF865.test.worker.ReveilSyncWorker
+import java.util.concurrent.TimeUnit
+
 class MainActivity : ComponentActivity() {
     private var alarmReveilId by mutableStateOf<String?>(null)
 
@@ -31,6 +39,9 @@ class MainActivity : ComponentActivity() {
         Log.d("MainActivity", "On Create")
         enableEdgeToEdge()
         handleAlarmIntent(intent)
+
+        // Lancer le worker
+        programmerSynchronisationArrierePlan()
 
         setContent {
             TestTheme {
@@ -47,6 +58,24 @@ class MainActivity : ComponentActivity() {
         }
 
         requestAlarmPermissions()
+    }
+    private fun programmerSynchronisationArrierePlan() {
+        // Uniquement si internet est disponible
+        val contraintes = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        //toutes les 15 minutes
+        val requeteSynchro = PeriodicWorkRequestBuilder<ReveilSyncWorker>(15, TimeUnit.MINUTES)
+            .setConstraints(contraintes)
+            .build()
+
+        // KEEP pour s’assurer que la tâche n’est pas dupliqué
+        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+            "synchro_reveils_supabase",
+            ExistingPeriodicWorkPolicy.KEEP,
+            requeteSynchro
+        )
     }
 
     override fun onNewIntent(intent: Intent) {
