@@ -1,12 +1,14 @@
 package ca.uqac.c8INF865.test.viewModel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ca.uqac.c8INF865.test.data.Reveil
 import ca.uqac.c8INF865.test.data.Son
 import ca.uqac.c8INF865.test.data.Utilisateur
 import ca.uqac.c8INF865.test.network.Supabase
 import ca.uqac.c8INF865.test.repository.MembreReveilInfo
+import ca.uqac.c8INF865.test.repository.ReveilCacheLocal
 import ca.uqac.c8INF865.test.repository.ReveilRepository
 import io.github.jan.supabase.gotrue.auth
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,64 +16,68 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-// État affiché sur l'écran d'accueil
 data class AccueilUiState(
     val listeReveils: List< Reveil > = emptyList()
 )
-
-// --------------------------------------------------------
-// VIEWMODEL DES RÉVEILS
-// --------------------------------------------------------
-
-class ReveilViewModel : ViewModel() {
+//androidViewModel donne accès au contexte de l'application sans jamais créer de fuite de mémoire
+//besoin pour le worker et bootreceiver
+class ReveilViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = ReveilRepository()
+    private val appContext = application.applicationContext
 
     private val _currentUserId = MutableStateFlow(Supabase.client.auth.currentUserOrNull()?.id)
-    val currentUserId: StateFlow<String?> = _currentUserId.asStateFlow()
+    val currentUserId: StateFlow< String? > = _currentUserId.asStateFlow()
 
-    // État global des réveils affichés
     private val _uiState = MutableStateFlow(AccueilUiState())
     val uiState: StateFlow< AccueilUiState > = _uiState.asStateFlow()
 
-    // Membres associés à chaque réveil
     private val _contactsParReveil = MutableStateFlow< Map< String, List< MembreReveilInfo > > >(emptyMap())
     val contactsParReveil: StateFlow< Map< String, List< MembreReveilInfo > > > = _contactsParReveil.asStateFlow()
 
-    // Sons associés aux membres et aux créateurs
     private val _sonsAssignes = MutableStateFlow< Map< String, Son > >(emptyMap())
     val sonsAssignes: StateFlow< Map< String, Son > > = _sonsAssignes.asStateFlow()
 
-    // Profils des utilisateurs liés aux réveils
     private val _utilisateursConnus = MutableStateFlow< Map< String, Utilisateur > >(emptyMap())
     val utilisateursConnus: StateFlow< Map< String, Utilisateur > > = _utilisateursConnus.asStateFlow()
 
-    // Charger les données des réveils au démarrage
     init {
         chargerReveils()
     }
 
-    // Récupérer les réveils et toutes les données nécessaires à leur affichage
     fun chargerReveils() {
         viewModelScope.launch {
             val userId = Supabase.client.auth.currentUserOrNull()?.id ?: return@launch
+            _currentUserId.value = userId
 
-            // Charger les réveils
+            // 1. Charger les réveils
             val reveils = repository.recupererReveils(userId)
             _uiState.value = AccueilUiState(reveils)
 
-            // Charger les membres de ces réveils
+            // 2. Charger les membres de ces réveils
             val ids = reveils.map { it.id }
             val membresMap = repository.recupererMembresParReveil(ids)
             _contactsParReveil.value = membresMap
 
-            // Récupérer tous les sons assignés (aux membres ET aux créateurs)
+            // 3. Récupérer tous les sons assignés (aux membres ET aux créateurs)
             val sonIdsMembres = membresMap.values.flatten().mapNotNull { it.sonId }
             val sonIdsCreateurs = reveils.mapNotNull { it.son_id }
             val tousLesSonIds = (sonIdsMembres + sonIdsCreateurs).distinct()
             val sonsMap = repository.recupererSonsParIds(tousLesSonIds)
             _sonsAssignes.value = sonsMap
 
-            // Récupérer les profils de tous les utilisateurs impliqués (pour afficher les pseudos)
+            // 4. Sauvegarder dans SharedPreferences pour le BootReceiver et le Worker
+            val cacheLocal = reveils.map { reveil ->
+                val monSonId = if (reveil.createur_id == userId) {
+                    reveil.son_id
+                } else {
+                    membresMap[reveil.id]?.find { it.membreId == userId }?.sonId
+                }
+                val monSonUrl = monSonId?.let { sonsMap[it]?.url }
+                ReveilCacheLocal(reveil = reveil, monSonId = monSonId, monSonUrl = monSonUrl)
+            }
+            repository.sauvegarderReveilsDansPrefs(appContext, cacheLocal)
+
+            // 5. Récupérer les profils des utilisateurs
             val userIds = mutableSetOf< String >()
             userIds.add(userId)
             reveils.forEach { userIds.add(it.createur_id) }

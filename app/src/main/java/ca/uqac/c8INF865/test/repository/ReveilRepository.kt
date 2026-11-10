@@ -9,6 +9,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
+import android.content.Context
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
 // --------------------------------------------------------
 // MODÈLES DE DONNÉES
 // --------------------------------------------------------
@@ -33,6 +37,13 @@ private data class ReveilMembreRelation(
 @Serializable
 private data class MembreSonUpdate(val son_id: String)
 
+// Modèle complet sauvegardé dans SharedPreferences pour le BootReceiver et le Worker
+@Serializable
+data class ReveilCacheLocal(
+    val reveil: Reveil,
+    val monSonId: String? = null,
+    val monSonUrl: String? = null
+)
 // Informations d'un membre associé à un réveil et du son qui lui est attribué
 data class MembreReveilInfo(val membreId: String, val sonId: String?, val sonUrl: String? = null)
 
@@ -283,6 +294,28 @@ class ReveilRepository {
             } catch (e: Exception) {
                 emptyMap()
             }
+        }
+    }
+
+    //Local
+    fun sauvegarderReveilsDansPrefs(context: Context, reveilsCache: List< ReveilCacheLocal >) {
+        try {
+            val prefs = context.getSharedPreferences("ReveilsPrefs", Context.MODE_PRIVATE)
+            val jsonString = Json.encodeToString(reveilsCache)
+            prefs.edit().putString("reveils_sauvegardes", jsonString).apply()
+        } catch (e: Exception) {
+            android.util.Log.e("ReveilRepository", "Erreur sauvegarde SharedPreferences", e)
+        }
+    }
+
+    fun lireReveilsDepuisPrefs(context: Context): List< ReveilCacheLocal > {
+        return try {
+            val prefs = context.getSharedPreferences("ReveilsPrefs", Context.MODE_PRIVATE)
+            val jsonString = prefs.getString("reveils_sauvegardes", null) ?: return emptyList()
+            Json.decodeFromString< List< ReveilCacheLocal > >(jsonString)
+        } catch (e: Exception) {
+            android.util.Log.e("ReveilRepository", "Erreur lecture SharedPreferences", e)
+            emptyList()
         }
     }
 }
