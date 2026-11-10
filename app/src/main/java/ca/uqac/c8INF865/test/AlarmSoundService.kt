@@ -82,7 +82,7 @@ class AlarmSoundService : Service() {
         return NotificationCompat.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("Alarme")
-            .setContentText("C'est l'heure de votre réveil !")
+            .setContentText("Réveil toi !!")
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentIntent(openApp)
             .setFullScreenIntent(fullScreenIntent, true)
