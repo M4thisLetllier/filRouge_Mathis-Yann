@@ -1,13 +1,9 @@
 package ca.uqac.c8INF865.test.ui.screens
 
-import android.Manifest
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -139,10 +135,6 @@ fun EcranAccueilReveil(
     val contactsParReveil by reveilViewModel.contactsParReveil.collectAsState()
     val currentUserId by reveilViewModel.currentUserId.collectAsState()
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { }
-
     val sonsAssignes by reveilViewModel.sonsAssignes.collectAsState()
 
     fun obtenirSonPourUtilisateur(reveil: Reveil): ca.uqac.c8INF865.test.data.Son? {
@@ -192,9 +184,6 @@ fun EcranAccueilReveil(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    if (Build.VERSION.SDK_INT >= 33) {
-                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
                     onModifierReveil(
                         Reveil(id = "", createur_id = "", nom = "", heure = "07:30", actif = true)
                     )

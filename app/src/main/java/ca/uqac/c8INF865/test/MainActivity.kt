@@ -1,9 +1,15 @@
 package ca.uqac.c8INF865.test
 
+import android.Manifest
+import android.app.NotificationManager
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
@@ -14,6 +20,11 @@ import ca.uqac.c8INF865.test.ui.theme.TestTheme
 
 class MainActivity : ComponentActivity() {
     private var alarmReveilId by mutableStateOf<String?>(null)
+
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+            openFullScreenIntentSettingsIfNeeded()
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,6 +45,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
+        requestAlarmPermissions()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -43,10 +56,42 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleAlarmIntent(intent: Intent) {
-        if (intent.action == ACTION_SHOW_ALARM) {
-            alarmReveilId = intent.getStringExtra("REVEIL_ID") ?: "default_id"
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
+        when (intent.action) {
+            ACTION_SHOW_ALARM -> {
+                alarmReveilId = intent.getStringExtra("REVEIL_ID") ?: "default_id"
+                setShowWhenLocked(true)
+                setTurnScreenOn(true)
+            }
+            ACTION_DISMISS_ALARM -> {
+                alarmReveilId = null
+            }
+        }
+    }
+
+    private fun requestAlarmPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            openFullScreenIntentSettingsIfNeeded()
+        }
+    }
+
+    private fun openFullScreenIntentSettingsIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+            !notificationManager.canUseFullScreenIntent()
+        ) {
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                    Uri.parse("package:$packageName")
+                )
+            )
         }
     }
 
@@ -58,5 +103,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val ACTION_SHOW_ALARM = "ca.uqac.c8INF865.test.ACTION_SHOW_ALARM"
+        const val ACTION_DISMISS_ALARM = "ca.uqac.c8INF865.test.ACTION_DISMISS_ALARM"
     }
 }

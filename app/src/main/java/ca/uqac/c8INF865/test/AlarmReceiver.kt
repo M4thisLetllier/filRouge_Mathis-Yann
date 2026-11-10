@@ -14,6 +14,12 @@ class AlarmReceiver : BroadcastReceiver() {
         if (intent.action == ACTION_DISMISS) {
             context.stopService(Intent(context, AlarmSoundService::class.java))
             notificationManager.cancel(AlarmSoundService.NOTIFICATION_ID(reveilId))
+            context.startActivity(
+                Intent(context, MainActivity::class.java).apply {
+                    action = MainActivity.ACTION_DISMISS_ALARM
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                }
+            )
             return
         }
 
